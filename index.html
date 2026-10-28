@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="cyber">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'" />
+  <title>The Watcher — System Telemetry</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Ambient background glow elements -->
+  <div class="ambient-mesh"></div>
+  <div class="ambient-glow glow-1"></div>
+  <div class="ambient-glow glow-2"></div>
+  <div class="ambient-glow glow-3"></div>
+  <div class="ambient-grid"></div>
+
+  <!-- Toast Notification Overlay -->
+  <div id="toast" class="toast-pill hidden">
+    <span id="toastIcon" class="toast-icon">✓</span>
+    <span id="toastMsg" class="toast-msg">Copied to clipboard</span>
+  </div>
+
+  <div class="app-layout">
+    <!-- Top Command Header -->
+    <header class="top-nav">
+      <div class="brand-group">
+        <div class="brand-orb">
+          <div class="orb-core"></div>
+          <div class="orb-ring"></div>
+        </div>
+        <div class="brand-meta">
+          <div class="brand-title-row">
+            <span class="brand-title">The Watcher</span>
+            <span class="brand-version-badge">v1.2</span>
+          </div>
+          <div class="brand-sub-wrap">
+            <span class="brand-dot"></span>
+            <span id="currentAppBadge" class="brand-sub">Ready</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-tools">
+        <!-- Theme Picker toggle -->
+        <button id="themeBtn" class="tool-btn" title="Change Theme Palette" aria-label="Theme">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10"></path>
+          </svg>
+        </button>
+
+        <!-- DPI Calibration & Settings -->
+        <button id="settingsBtn" class="tool-btn" title="Hardware Settings & DPI" aria-label="Settings">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+
+        <!-- Live Status Pill -->
+        <div id="statusBadge" class="status-pill live">
+          <span class="live-beacon"></span>
+          <span id="statusText">LIVE</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Theme Drawer Popover -->
+    <div id="themeDrawer" class="popover-drawer hidden">
+      <div class="drawer-header">
+        <div class="drawer-title-group">
+          <span class="drawer-title">Theme Palette</span>
+          <span class="drawer-sub">Select visual profile</span>
+        </div>
+        <button id="closeThemeBtn" class="close-btn" aria-label="Close">&times;</button>
+      </div>
+      <div class="theme-grid">
+        <button class="theme-card active" data-theme-name="cyber">
+          <span class="theme-swatch cyber-swatch"></span>
+          <div class="theme-card-meta">
+            <span class="theme-name">Cyber Cyan</span>
+            <span class="theme-tone">Electric Cyan & Neon</span>
+          </div>
+          <span class="theme-check">✓</span>
+        </button>
+        <button class="theme-card" data-theme-name="tokyo">
+          <span class="theme-swatch tokyo-swatch"></span>
+          <div class="theme-card-meta">
+            <span class="theme-name">Tokyo Neon</span>
+            <span class="theme-tone">Hot Pink & Violet</span>
+          </div>
+          <span class="theme-check">✓</span>
+        </button>
+        <button class="theme-card" data-theme-name="solar">
+          <span class="theme-swatch solar-swatch"></span>
+          <div class="theme-card-meta">
+            <span class="theme-name">Solar Amber</span>
+            <span class="theme-tone">Hyper Gold & Crimson</span>
+          </div>
+          <span class="theme-check">✓</span>
+        </button>
+        <button class="theme-card" data-theme-name="frost">
+          <span class="theme-swatch frost-swatch"></span>
+          <div class="theme-card-meta">
+            <span class="theme-name">Glacier Frost</span>
+            <span class="theme-tone">Cryo Azure & Cobalt</span>
+          </div>
+          <span class="theme-check">✓</span>
+        </button>
+        <button class="theme-card" data-theme-name="matrix">
+          <span class="theme-swatch matrix-swatch"></span>
+          <div class="theme-card-meta">
+            <span class="theme-name">Matrix Emerald</span>
+            <span class="theme-tone">Phosphor Green & Mint</span>
+          </div>
+          <span class="theme-check">✓</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Settings & Calibration Drawer -->
+    <div id="settingsDrawer" class="popover-drawer hidden">
+      <div class="drawer-header">
+        <div class="drawer-title-group">
+          <span class="drawer-title">Hardware Settings</span>
+          <span class="drawer-sub">Sensors & preferences</span>
+        </div>
+        <button id="closeSettingsBtn" class="close-btn" aria-label="Close">&times;</button>
+      </div>
+      <div class="dpi-body">
+        <div class="dpi-input-row">
+          <div class="dpi-label-group">
+            <span class="dpi-desc">Mouse Sensor DPI</span>
+            <span class="dpi-sub">Hardware dots-per-inch</span>
+          </div>
+          <div class="dpi-pill-input">
+            <input id="dpiInput" type="number" min="100" max="32000" step="50" value="1000" />
+            <span class="unit-tag">DPI</span>
+          </div>
+        </div>
+        <div class="dpi-preset-chips">
+          <button class="chip" data-dpi="400">400</button>
+          <button class="chip" data-dpi="800">800</button>
+          <button class="chip active" data-dpi="1000">1000</button>
+          <button class="chip" data-dpi="1600">1600</button>
+          <button class="chip" data-dpi="3200">3200</button>
+        </div>
+
+        <div class="setting-divider"></div>
+
+        <div class="setting-toggle-row">
+          <div class="toggle-meta">
+            <span class="toggle-title">Start with Windows</span>
+            <span class="toggle-hint">Launch minimized in tray on boot</span>
+          </div>
+          <label class="switch">
+            <input id="autoStartInput" type="checkbox" />
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="hotkey-banner">
+          <div class="hotkey-label">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="6" y1="12" x2="18" y2="12"></line></svg>
+            <span>Global HUD Hotkey</span>
+          </div>
+          <kbd class="kbd-badge">Ctrl + Shift + M</kbd>
+        </div>
+
+        <div class="tray-tip">
+          <span class="tray-tip-icon">ℹ</span>
+          <span>Closing the window docks it silently into the system tray.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hero Deck: Dual Odometer & Live Speedometer -->
+    <section class="hero-deck">
+      <!-- Main Odometer Card -->
+      <div class="hero-panel hero-distance">
+        <div class="panel-head">
+          <span class="eyebrow">CURSOR TRAVEL TODAY</span>
+          <div class="unit-toggle-strip">
+            <button class="unit-btn" data-unit="px">px</button>
+            <button class="unit-btn active" data-unit="m">m</button>
+            <button class="unit-btn" data-unit="km">km</button>
+            <button class="unit-btn" data-unit="mi">mi</button>
+          </div>
+        </div>
+
+        <div class="odometer-row">
+          <div class="odometer-number-wrap">
+            <span id="distance" class="glow-odometer">0.0</span>
+            <span id="distanceUnit" class="glow-unit">m</span>
+          </div>
+        </div>
+
+        <!-- Milestone Progress -->
+        <div class="milestone-box" id="milestoneBox">
+          <div class="milestone-text">
+            <div class="milestone-left">
+              <span id="milestoneIcon" class="milestone-emoji">🎳</span>
+              <span id="milestoneDesc" class="milestone-title">Goal: Bowling Lane (10m)</span>
+            </div>
+            <span id="milestonePct" class="milestone-percent">0%</span>
+          </div>
+          <div class="milestone-bar-bg">
+            <div id="milestoneProgress" class="milestone-bar-fill" style="width: 0%">
+              <div class="milestone-flare"></div>
+            </div>
+          </div>
+          <div class="milestone-sub-row">
+            <span id="milestoneRemaining" class="milestone-sub">10m remaining to reach goal</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Speedometer & APM Dial -->
+      <div class="hero-panel hero-speed">
+        <div class="speed-dial-wrap">
+          <svg class="speed-svg" viewBox="0 0 100 64">
+            <!-- Defs for gauge gradient -->
+            <defs>
+              <linearGradient id="speedGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="var(--accent-dim, #00f5d4)" />
+                <stop offset="50%" stop-color="var(--accent, #00f5d4)" />
+                <stop offset="100%" stop-color="var(--accent-alt, #7928ca)" />
+              </linearGradient>
+            </defs>
+            <!-- Background Arc Track -->
+            <path class="speed-track" d="M 15 54 A 35 35 0 0 1 85 54" fill="none" stroke-width="7" stroke-linecap="round"></path>
+            <!-- Animated Value Arc -->
+            <path id="speedArc" class="speed-meter" d="M 15 54 A 35 35 0 0 1 85 54" fill="none" stroke-width="7" stroke-dasharray="110" stroke-dashoffset="110" stroke-linecap="round"></path>
+          </svg>
+          <div class="speed-value-box" id="speedBox" title="Click to cycle speed unit (m/s, km/h, px/s)">
+            <span id="speedValue" class="speed-num">0.00</span>
+            <span id="speedUnit" class="speed-unit">m/s</span>
+            <span id="speedAlt" class="speed-alt">0.0 km/h</span>
+          </div>
+        </div>
+        <div class="speed-meta">
+          <div class="meta-item">
+            <span class="meta-label">PEAK SPEED</span>
+            <span id="peakSpeed" class="meta-val">0.00 m/s</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">INTENSITY</span>
+            <span id="apmBadge" class="apm-pill chill">0 APM</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5 Glanceable Glass Tiles -->
+    <section class="tiles-grid">
+      <!-- Active Tile -->
+      <div class="glass-tile">
+        <div class="tile-icon-wrap icon-cyan">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+        </div>
+        <div class="tile-data">
+          <span class="tile-label">Active Time</span>
+          <span id="activeTime" class="tile-number">0m</span>
+          <span class="tile-sub">In motion</span>
+        </div>
+      </div>
+
+      <!-- PC On Time Tile -->
+      <div class="glass-tile">
+        <div class="tile-icon-wrap icon-amber">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+        </div>
+        <div class="tile-data">
+          <span class="tile-label">PC On Time</span>
+          <span id="totalTime" class="tile-number">0m</span>
+          <span class="tile-sub">Session total</span>
+        </div>
+      </div>
+
+      <!-- Idle Time Tile -->
+      <div class="glass-tile">
+        <div class="tile-icon-wrap icon-dim">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </div>
+        <div class="tile-data">
+          <span class="tile-label">Idle Time</span>
+          <span id="idleTime" class="tile-number">0m</span>
+          <span id="idlePct" class="tile-sub">0% of today</span>
+        </div>
+      </div>
+
+      <!-- Clicks Tile -->
+      <div class="glass-tile">
+        <div class="tile-icon-wrap icon-purple">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="6" y="3" width="12" height="18" rx="6"></rect>
+            <line x1="12" y1="7" x2="12" y2="11"></line>
+          </svg>
+        </div>
+        <div class="tile-data">
+          <span class="tile-label">Clicks</span>
+          <span id="clicks" class="tile-number">0</span>
+          <span id="clicksSub" class="tile-sub">L: 0 · R: 0</span>
+        </div>
+      </div>
+
+      <!-- Keys Tile -->
+      <div class="glass-tile">
+        <div class="tile-icon-wrap icon-blue">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+            <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M7 16h10"></path>
+          </svg>
+        </div>
+        <div class="tile-data">
+          <span class="tile-label">Keystrokes</span>
+          <span id="keys" class="tile-number">0</span>
+          <span id="wordsSub" class="tile-sub">~0 words</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Deep-Dive Interactive Deck (Tabs) -->
+    <section class="intel-deck">
+      <nav class="intel-tabs">
+        <button class="intel-tab-btn active" data-tab="apps">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          Top Apps
+        </button>
+        <button class="intel-tab-btn" data-tab="keys">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="6" y1="12" x2="18" y2="12"></line></svg>
+          Top Keys
+        </button>
+        <button class="intel-tab-btn" data-tab="mouse">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="3" width="12" height="18" rx="6"></rect><line x1="12" y1="7" x2="12" y2="11"></line></svg>
+          Click Map
+        </button>
+        <button class="intel-tab-btn" data-tab="chart">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"></path><path d="m19 9-5 5-4-4-3 3"></path></svg>
+          Trends
+        </button>
+      </nav>
+
+      <div class="intel-body">
+        <!-- 1. Apps Panel -->
+        <div id="tab-apps" class="intel-pane active">
+          <div class="apps-toolbar">
+            <span class="apps-toolbar-title">TOP APPS · TODAY</span>
+          </div>
+          <ol id="appUsage" class="visual-list"></ol>
+        </div>
+
+        <!-- 2. Keys Panel -->
+        <div id="tab-keys" class="intel-pane">
+          <div class="keycaps-wrap">
+            <ol id="topKeys" class="visual-list"></ol>
+          </div>
+        </div>
+
+        <!-- 3. Mouse Map Panel -->
+        <div id="tab-mouse" class="intel-pane">
+          <div class="mouse-map-container">
+            <div class="mouse-silhouette">
+              <div id="mouseLeftZone" class="mouse-button-zone left-btn">
+                <span class="btn-zone-label">LEFT</span>
+                <span id="mouseLeftPct" class="btn-zone-pct">0%</span>
+              </div>
+              <div id="mouseRightZone" class="mouse-button-zone right-btn">
+                <span class="btn-zone-label">RIGHT</span>
+                <span id="mouseRightPct" class="btn-zone-pct">0%</span>
+              </div>
+              <div id="mouseMidZone" class="mouse-scroll-wheel">
+                <span class="scroll-dot"></span>
+              </div>
+            </div>
+            <div class="mouse-stats-sidebar">
+              <div class="mouse-stat-row">
+                <span class="stat-dot dot-left"></span>
+                <span class="mouse-stat-label">Left Clicks:</span>
+                <strong id="mouseLeftTotal" class="mouse-stat-val">0</strong>
+              </div>
+              <div class="mouse-stat-row">
+                <span class="stat-dot dot-right"></span>
+                <span class="mouse-stat-label">Right Clicks:</span>
+                <strong id="mouseRightTotal" class="mouse-stat-val">0</strong>
+              </div>
+              <div class="mouse-stat-row">
+                <span class="stat-dot dot-mid"></span>
+                <span class="mouse-stat-label">Middle / Wheel:</span>
+                <strong id="mouseMidTotal" class="mouse-stat-val">0</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Rich Trends & Analytics Panel -->
+        <div id="tab-chart" class="intel-pane">
+          <div class="trend-toolbar">
+            <div class="trend-metrics-group">
+              <button class="trend-metric-btn active" data-metric="dist" title="Mouse Distance">Distance</button>
+              <button class="trend-metric-btn" data-metric="clicks" title="Total Clicks">Clicks</button>
+              <button class="trend-metric-btn" data-metric="keys" title="Keystrokes">Keys</button>
+              <button class="trend-metric-btn" data-metric="time" title="Active Time">Active</button>
+            </div>
+            <div class="trend-range-group">
+              <button class="trend-range-btn active" data-range="7">7D</button>
+              <button class="trend-range-btn" data-range="14">14D</button>
+            </div>
+          </div>
+
+          <div class="chart-box">
+            <canvas id="chart"></canvas>
+            <div id="chartTooltip" class="chart-tooltip hidden"></div>
+          </div>
+
+          <!-- Trend KPI Tiles -->
+          <div class="trend-kpis">
+            <div class="trend-kpi-card">
+              <span class="trend-kpi-label">PERIOD TOTAL</span>
+              <strong id="trendTotalVal" class="trend-kpi-num">--</strong>
+            </div>
+            <div class="trend-kpi-card">
+              <span class="trend-kpi-label">DAILY AVG</span>
+              <strong id="trendAvgVal" class="trend-kpi-num">--</strong>
+            </div>
+            <div class="trend-kpi-card">
+              <span class="trend-kpi-label">BEST DAY</span>
+              <strong id="trendPeakVal" class="trend-kpi-num">--</strong>
+            </div>
+          </div>
+
+          <!-- Day Inspector Detail Card -->
+          <div id="trendDayDetail" class="trend-day-card">
+            <div class="trend-day-header">
+              <span id="detailDayTitle" class="trend-day-date">Today's Summary</span>
+              <span id="detailDayBadge" class="trend-badge">LIVE</span>
+            </div>
+            <div id="detailDayStats" class="trend-day-grid">
+              <div class="trend-stat"><span class="label">Distance</span> <strong id="detailDist">--</strong></div>
+              <div class="trend-stat"><span class="label">Clicks</span> <strong id="detailClicks">--</strong></div>
+              <div class="trend-stat"><span class="label">Keystrokes</span> <strong id="detailKeys">--</strong></div>
+              <div class="trend-stat"><span class="label">Active Time</span> <strong id="detailTime">--</strong></div>
+              <div class="trend-stat col-span-2"><span class="label">Top Application</span> <strong id="detailApp">--</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bottom Action Deck -->
+    <footer class="action-footer">
+      <button id="toggle" class="btn btn-action-primary" title="Toggle Tracking">
+        <svg id="toggleIcon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <rect x="6" y="4" width="4" height="16" rx="1"></rect>
+          <rect x="14" y="4" width="4" height="16" rx="1"></rect>
+        </svg>
+        <span id="toggleText">Pause</span>
+      </button>
+
+      <button id="shareBtn" class="btn btn-action-secondary" title="Copy Daily Stats to Clipboard">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+          <polyline points="16 6 12 2 8 6"></polyline>
+          <line x1="12" y1="2" x2="12" y2="15"></line>
+        </svg>
+        <span id="shareText">Share</span>
+      </button>
+
+      <button id="reset" class="btn btn-action-danger" title="Reset Today's Counters">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+          <path d="M3 3v5h5"></path>
+        </svg>
+        <span id="resetText">Reset</span>
+      </button>
+    </footer>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

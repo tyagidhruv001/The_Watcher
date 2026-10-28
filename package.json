@@ -1,0 +1,38 @@
+{
+  "name": "the-watcher",
+  "version": "1.0.0",
+  "description": "Personal input-activity tracker: cursor distance, clicks, and key-press counts.",
+  "author": "The Watcher",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "dependencies": {
+    "get-windows": "^9.2.0",
+    "uiohook-napi": "^1.5.0"
+  },
+  "devDependencies": {
+    "electron": "^41.10.7",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.example.thewatcher",
+    "productName": "The Watcher",
+    "files": [
+      "**/*",
+      "!README.md"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.utilities"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}
