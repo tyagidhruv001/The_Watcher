@@ -2,84 +2,101 @@
 //
 // Two jobs:
 //   1. Idle detection — via Electron's own `powerMonitor.getSystemIdleTime()`.
-//      No native addon needed for this; Electron ships it, and it works the
-//      same way on Windows, macOS, and Linux.
-//   2. Active window — via the `get-windows` package (the current name for
-//      what used to be published as `active-win`). It also works across all
-//      three platforms without you writing any native Win32/Cocoa/X11 code.
+//      No native addon needed; it works the same on Windows, macOS and Linux.
+//   2. Active window — via the `get-windows` package (formerly `active-win`).
 //
-// get-windows is an ESM-only package. This file is CommonJS (to match the
-// rest of the app), so it's loaded with a dynamic import() the first time
-// it's needed — a plain require('get-windows') would throw.
+// get-windows is ESM-only and this file is CommonJS, so it is loaded lazily with
+// a dynamic import() — a plain require('get-windows') would throw.
 
 const path = require('path');
-const { powerMonitor } = require('electron');
+const { app, powerMonitor } = require('electron');
 const { friendlyName } = require('./appNames');
 
 const IDLE_THRESHOLD_SECONDS = 60; // no mouse/keyboard input for this long = idle
 
-let getWindowsModule = null;
-async function loadGetWindows() {
-  if (!getWindowsModule) getWindowsModule = import('get-windows');
-  try {
-    return await getWindowsModule;
-  } catch (err) {
-    // A transient import failure must not poison every future polling attempt.
-    getWindowsModule = null;
-    throw err;
+// Ask for the least macOS permission we can get away with.
+// NOTE: on macOS this means `title` always comes back empty, so the title-based
+// matching below only has an effect on Windows.
+const ACTIVE_WINDOW_OPTIONS = {
+  accessibilityPermission: false,
+  screenRecordingPermission: false,
+};
+
+// Apps are identified by their executable's file name (e.g. "chrome.exe").
+// Two kinds of host process hide the "real" app, so we look inside them:
+//   - Browsers, which run PWAs such as Claude or ChatGPT
+//   - Terminals, which run CLI tools such as Claude Code
+// Rules are checked in order and the first match wins.
+// (Don't add the /g flag to these patterns — .test() would become stateful.)
+const BROWSER_EXES = new Set(['chrome.exe', 'msedge.exe', 'brave.exe', 'chrome_proxy.exe']);
+const BROWSER_APP_RULES = [
+  { pattern: /claude/i, key: 'claude.exe' },
+  { pattern: /chatgpt/i, key: 'chatgpt.exe' },
+];
+
+const TERMINAL_EXES = new Set(['windowsterminal.exe', 'cmd.exe', 'powershell.exe', 'conhost.exe', 'terminal.exe']);
+const TERMINAL_APP_RULES = [
+  { pattern: /claude/i, key: 'claude-code.exe' },
+];
+
+// Cache the import *promise* so concurrent polls share one load. If it fails,
+// clear the cache so a transient error doesn't poison every future poll.
+let getWindowsPromise = null;
+function loadGetWindows() {
+  if (!getWindowsPromise) {
+    getWindowsPromise = import('get-windows').catch((err) => {
+      getWindowsPromise = null;
+      throw err;
+    });
   }
+  return getWindowsPromise;
 }
 
-// Windows/Linux don't reliably give a "friendly app name" the way macOS
-// bundles do, so identify apps primarily by their executable's file name
-// (e.g. "chrome.exe").
-// However, Chrome/Edge PWAs (like Claude or ChatGPT) run inside chrome.exe/msedge.exe,
-// and terminal tools like Claude Code run inside windowsterminal.exe/cmd.exe.
-// We check for these specifically so they are counted under their real names!
 function exeKeyFor(win) {
-  const raw = (win.owner && (win.owner.path ? path.basename(win.owner.path) : win.owner.name)) || 'unknown';
+  const owner = win.owner || {};
+  const raw = (owner.path ? path.basename(owner.path) : owner.name) || 'unknown';
   const exe = raw.toLowerCase();
-  const title = (win.title || '').trim();
+  const title = win.title || '';
+  const ownerName = owner.name || '';
 
-  const ownerName = (win.owner && win.owner.name) ? win.owner.name : '';
-
-  // 1. Detect Chrome / Edge / Brave PWAs (e.g. Claude desktop shortcut, ChatGPT PWA)
-  if (exe === 'chrome.exe' || exe === 'msedge.exe' || exe === 'brave.exe' || exe === 'chrome_proxy.exe') {
-    if (/claude/i.test(title) || /claude/i.test(ownerName)) {
-      return 'claude.exe';
+  if (BROWSER_EXES.has(exe)) {
+    for (const { pattern, key } of BROWSER_APP_RULES) {
+      if (pattern.test(title) || pattern.test(ownerName)) return key;
     }
-    if (/chatgpt/i.test(title) || /chatgpt/i.test(ownerName)) {
-      return 'chatgpt.exe';
-    }
-  }
-
-  // 2. Detect Claude Code CLI running inside a terminal or cmd
-  if (exe === 'windowsterminal.exe' || exe === 'cmd.exe' || exe === 'powershell.exe' || exe === 'conhost.exe' || exe === 'terminal.exe') {
-    if (/claude/i.test(title)) {
-      return 'claude-code.exe';
+  } else if (TERMINAL_EXES.has(exe)) {
+    for (const { pattern, key } of TERMINAL_APP_RULES) {
+      if (pattern.test(title)) return key;
     }
   }
-
   return exe;
 }
 
+// A persistent failure (e.g. a missing permission) would otherwise log on every
+// poll, so only log when the message changes. Dev builds only.
+let lastWarning = null;
+function warnOnce(err) {
+  if (app.isPackaged) return;
+  const message = err?.message ?? String(err);
+  if (message === lastWarning) return;
+  lastWarning = message;
+  console.warn('[windowTracker] activeWindow poll error:', message);
+}
+
 async function pollActivity() {
-  const idleSeconds = powerMonitor.getSystemIdleTime();
-  const isIdle = idleSeconds >= IDLE_THRESHOLD_SECONDS;
+  // Read idle time *before* the await so it reflects the moment of the poll.
+  const isIdle = powerMonitor.getSystemIdleTime() >= IDLE_THRESHOLD_SECONDS;
 
   try {
     const { activeWindow } = await loadGetWindows();
-    // Ask for the least amount of macOS permission we can get away with:
-    // we only need the owning process, not the window title or browser URL.
-    const win = await activeWindow({ accessibilityPermission: false, screenRecordingPermission: false });
-    if (!win || !win.owner) return { isIdle, exeKey: null, displayName: null };
+    const win = await activeWindow(ACTIVE_WINDOW_OPTIONS);
+    lastWarning = null;
+
+    if (!win?.owner) return { isIdle, exeKey: null, displayName: null };
+
     const exeKey = exeKeyFor(win);
-    const rawOwnerName = win.owner && win.owner.name ? win.owner.name : null;
-    return { isIdle, exeKey, displayName: friendlyName(exeKey, rawOwnerName) };
+    return { isIdle, exeKey, displayName: friendlyName(exeKey, win.owner.name || null) };
   } catch (err) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('[windowTracker] activeWindow poll error:', err && err.message ? err.message : err);
-    }
+    warnOnce(err);
     return { isIdle, exeKey: null, displayName: null };
   }
 }

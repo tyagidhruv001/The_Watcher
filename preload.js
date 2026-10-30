@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('api', {
   getAutoStart: () => ipcRenderer.invoke('get-auto-start'),
   setAutoStart: (flag) => ipcRenderer.invoke('set-auto-start', flag),
   getApps: (range) => ipcRenderer.invoke('get-apps', range),
+  getRetention: () => ipcRenderer.invoke('get-retention'),
+  setRetention: (days) => ipcRenderer.invoke('set-retention', days),
   copyToClipboard: (text) => {
     if (typeof text !== 'string' || text.length > 100000) return false;
     clipboard.writeText(text);
