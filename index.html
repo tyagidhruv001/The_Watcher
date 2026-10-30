@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="cyber">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'" />
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'" />
   <title>The Watcher — System Telemetry</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
   <!-- Ambient background glow elements -->
   <div class="ambient-mesh"></div>
@@ -32,7 +35,7 @@
         <div class="brand-meta">
           <div class="brand-title-row">
             <span class="brand-title">The Watcher</span>
-            <span class="brand-version-badge">v1.2</span>
+            <span class="brand-version-badge">v1.4</span>
           </div>
           <div class="brand-sub-wrap">
             <span class="brand-dot"></span>
@@ -44,7 +47,8 @@
       <div class="header-tools">
         <!-- Theme Picker toggle -->
         <button id="themeBtn" class="tool-btn" title="Change Theme Palette" aria-label="Theme">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+            stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"></circle>
             <path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10"></path>
           </svg>
@@ -52,9 +56,12 @@
 
         <!-- DPI Calibration & Settings -->
         <button id="settingsBtn" class="tool-btn" title="Hardware Settings & DPI" aria-label="Settings">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+            stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+            </path>
           </svg>
         </button>
 
@@ -162,7 +169,10 @@
 
         <div class="hotkey-banner">
           <div class="hotkey-label">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="6" y1="12" x2="18" y2="12"></line></svg>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+              <line x1="6" y1="12" x2="18" y2="12"></line>
+            </svg>
             <span>Global HUD Hotkey</span>
           </div>
           <kbd class="kbd-badge">Ctrl + Shift + M</kbd>
@@ -229,9 +239,11 @@
               </linearGradient>
             </defs>
             <!-- Background Arc Track -->
-            <path class="speed-track" d="M 15 54 A 35 35 0 0 1 85 54" fill="none" stroke-width="7" stroke-linecap="round"></path>
+            <path class="speed-track" d="M 15 54 A 35 35 0 0 1 85 54" fill="none" stroke-width="7"
+              stroke-linecap="round"></path>
             <!-- Animated Value Arc -->
-            <path id="speedArc" class="speed-meter" d="M 15 54 A 35 35 0 0 1 85 54" fill="none" stroke-width="7" stroke-dasharray="110" stroke-dashoffset="110" stroke-linecap="round"></path>
+            <path id="speedArc" class="speed-meter" d="M 15 54 A 35 35 0 0 1 85 54" fill="none" stroke-width="7"
+              stroke-dasharray="110" stroke-dashoffset="110" stroke-linecap="round"></path>
           </svg>
           <div class="speed-value-box" id="speedBox" title="Click to cycle speed unit (m/s, km/h, px/s)">
             <span id="speedValue" class="speed-num">0.00</span>
@@ -257,7 +269,8 @@
       <!-- Active Tile -->
       <div class="glass-tile">
         <div class="tile-icon-wrap icon-cyan">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+            stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"></circle>
             <polyline points="12 6 12 12 16 14"></polyline>
           </svg>
@@ -272,7 +285,8 @@
       <!-- PC On Time Tile -->
       <div class="glass-tile">
         <div class="tile-icon-wrap icon-amber">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+            stroke-linecap="round" stroke-linejoin="round">
             <rect x="2" y="3" width="20" height="14" rx="2"></rect>
             <line x1="8" y1="21" x2="16" y2="21"></line>
             <line x1="12" y1="17" x2="12" y2="21"></line>
@@ -288,7 +302,8 @@
       <!-- Idle Time Tile -->
       <div class="glass-tile">
         <div class="tile-icon-wrap icon-dim">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+            stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
           </svg>
         </div>
@@ -302,7 +317,8 @@
       <!-- Clicks Tile -->
       <div class="glass-tile">
         <div class="tile-icon-wrap icon-purple">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+            stroke-linecap="round" stroke-linejoin="round">
             <rect x="6" y="3" width="12" height="18" rx="6"></rect>
             <line x1="12" y1="7" x2="12" y2="11"></line>
           </svg>
@@ -317,7 +333,8 @@
       <!-- Keys Tile -->
       <div class="glass-tile">
         <div class="tile-icon-wrap icon-blue">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+            stroke-linecap="round" stroke-linejoin="round">
             <rect x="2" y="4" width="20" height="16" rx="2"></rect>
             <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M7 16h10"></path>
           </svg>
@@ -334,19 +351,33 @@
     <section class="intel-deck">
       <nav class="intel-tabs">
         <button class="intel-tab-btn active" data-tab="apps">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
           Top Apps
         </button>
         <button class="intel-tab-btn" data-tab="keys">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="6" y1="12" x2="18" y2="12"></line></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+            <line x1="6" y1="12" x2="18" y2="12"></line>
+          </svg>
           Top Keys
         </button>
         <button class="intel-tab-btn" data-tab="mouse">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="3" width="12" height="18" rx="6"></rect><line x1="12" y1="7" x2="12" y2="11"></line></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="6" y="3" width="12" height="18" rx="6"></rect>
+            <line x1="12" y1="7" x2="12" y2="11"></line>
+          </svg>
           Click Map
         </button>
         <button class="intel-tab-btn" data-tab="chart">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"></path><path d="m19 9-5 5-4-4-3 3"></path></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 3v18h18"></path>
+            <path d="m19 9-5 5-4-4-3 3"></path>
+          </svg>
           Trends
         </button>
       </nav>
@@ -450,7 +481,8 @@
               <div class="trend-stat"><span class="label">Clicks</span> <strong id="detailClicks">--</strong></div>
               <div class="trend-stat"><span class="label">Keystrokes</span> <strong id="detailKeys">--</strong></div>
               <div class="trend-stat"><span class="label">Active Time</span> <strong id="detailTime">--</strong></div>
-              <div class="trend-stat col-span-2"><span class="label">Top Application</span> <strong id="detailApp">--</strong></div>
+              <div class="trend-stat col-span-2"><span class="label">Top Application</span> <strong
+                  id="detailApp">--</strong></div>
             </div>
           </div>
         </div>
@@ -468,7 +500,8 @@
       </button>
 
       <button id="shareBtn" class="btn btn-action-secondary" title="Copy Daily Stats to Clipboard">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+          stroke-linecap="round" stroke-linejoin="round">
           <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
           <polyline points="16 6 12 2 8 6"></polyline>
           <line x1="12" y1="2" x2="12" y2="15"></line>
@@ -477,7 +510,8 @@
       </button>
 
       <button id="reset" class="btn btn-action-danger" title="Reset Today's Counters">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+          stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
           <path d="M3 3v5h5"></path>
         </svg>
@@ -488,4 +522,5 @@
 
   <script src="renderer.js"></script>
 </body>
+
 </html>

@@ -328,6 +328,27 @@ if (!gotTheLock) {
       return storage.getAggregatedApps(data, safeRange, friendlyName);
     });
 
+    handleTrusted('get-retention', () => {
+      return data.retentionDays ?? storage.DEFAULT_RETENTION_DAYS;
+    });
+
+    handleTrusted('set-retention', (_event, days) => {
+      const parsedDays = Number(days);
+      if (days === 'unlimited' || days === 0 || days === null) {
+        data.retentionDays = 0; // 0 = unlimited
+      } else if (Number.isFinite(parsedDays) && parsedDays > 0) {
+        data.retentionDays = Math.floor(parsedDays);
+      } else {
+        return data.retentionDays ?? storage.DEFAULT_RETENTION_DAYS;
+      }
+      storage.pruneOldDays(data);
+      if (storage.save(data)) {
+        isDirty = false;
+        lastSaveTime = Date.now();
+      }
+      return data.retentionDays;
+    });
+
     // Safety persistence: save dirty state on system shutdown, restart or user logoff
     app.on('session-end', () => {
       if (data && isDirty) {

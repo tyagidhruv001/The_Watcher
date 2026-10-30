@@ -10,7 +10,7 @@ function getUserDataPath() {
   if (app && typeof app.getPath === 'function') {
     try {
       return app.getPath('userData');
-    } catch {}
+    } catch { }
   }
   return path.join(process.env.APPDATA || process.env.HOME || '.', 'the-watcher');
 }
@@ -24,6 +24,13 @@ function todayKey(date = new Date()) {
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
+}
+
+const DATE_KEY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+function toSafeNumber(val, defaultVal = 0) {
+  const n = typeof val === 'number' ? val : Number(val);
+  return Number.isFinite(n) && n >= 0 ? n : defaultVal;
 }
 
 function emptyDay() {
@@ -42,33 +49,133 @@ function emptyDay() {
   };
 }
 
-function mergeDays(targetDay, sourceDay) {
-  if (!targetDay) return { ...emptyDay(), ...sourceDay };
-  if (!sourceDay) return targetDay;
+// Validates and repairs an individual day object, replacing missing,
+// negative, or non-finite values with safe defaults.
+function normalizeDay(rawDay) {
+  const base = emptyDay();
+  if (!rawDay || typeof rawDay !== 'object' || Array.isArray(rawDay)) {
+    return base;
+  }
 
-  const merged = { ...emptyDay(), ...targetDay };
-  merged.mousePixels = (merged.mousePixels || 0) + (sourceDay.mousePixels || 0);
-  merged.leftClicks = (merged.leftClicks || 0) + (sourceDay.leftClicks || 0);
-  merged.rightClicks = (merged.rightClicks || 0) + (sourceDay.rightClicks || 0);
-  merged.middleClicks = (merged.middleClicks || 0) + (sourceDay.middleClicks || 0);
-  merged.keyPresses = (merged.keyPresses || 0) + (sourceDay.keyPresses || 0);
-  merged.activeSeconds = (merged.activeSeconds || 0) + (sourceDay.activeSeconds || 0);
-  merged.idleSeconds = (merged.idleSeconds || 0) + (sourceDay.idleSeconds || 0);
-  merged.totalSeconds = (merged.totalSeconds || 0) + (sourceDay.totalSeconds || 0);
-  merged.peakSpeed = Math.max(merged.peakSpeed || 0, sourceDay.peakSpeed || 0);
+  base.mousePixels = toSafeNumber(rawDay.mousePixels, 0);
+  base.leftClicks = Math.floor(toSafeNumber(rawDay.leftClicks, 0));
+  base.rightClicks = Math.floor(toSafeNumber(rawDay.rightClicks, 0));
+  base.middleClicks = Math.floor(toSafeNumber(rawDay.middleClicks, 0));
+  base.keyPresses = Math.floor(toSafeNumber(rawDay.keyPresses, 0));
+  base.activeSeconds = toSafeNumber(rawDay.activeSeconds, 0);
+  base.idleSeconds = toSafeNumber(rawDay.idleSeconds, 0);
+  base.totalSeconds = toSafeNumber(rawDay.totalSeconds, 0);
+  base.peakSpeed = toSafeNumber(rawDay.peakSpeed, 0);
 
-  merged.keys = { ...(merged.keys || {}) };
-  if (sourceDay.keys) {
-    for (const [k, count] of Object.entries(sourceDay.keys)) {
-      merged.keys[k] = (merged.keys[k] || 0) + Number(count || 0);
+  // Normalize key-press counter dictionary
+  base.keys = {};
+  if (rawDay.keys && typeof rawDay.keys === 'object' && !Array.isArray(rawDay.keys)) {
+    for (const [k, count] of Object.entries(rawDay.keys)) {
+      if (typeof k === 'string' && k.length > 0) {
+        const safeCount = Math.floor(toSafeNumber(count, 0));
+        if (safeCount > 0) {
+          base.keys[k] = safeCount;
+        }
+      }
     }
   }
 
-  merged.apps = { ...(merged.apps || {}) };
-  if (sourceDay.apps) {
-    for (const [appKey, secs] of Object.entries(sourceDay.apps)) {
-      merged.apps[appKey] = (merged.apps[appKey] || 0) + Number(secs || 0);
+  // Normalize app-duration dictionary
+  base.apps = {};
+  if (rawDay.apps && typeof rawDay.apps === 'object' && !Array.isArray(rawDay.apps)) {
+    for (const [appKey, secs] of Object.entries(rawDay.apps)) {
+      if (typeof appKey === 'string' && appKey.length > 0) {
+        const safeSecs = toSafeNumber(secs, 0);
+        if (safeSecs > 0) {
+          base.apps[appKey] = safeSecs;
+        }
+      }
     }
+  }
+
+  return base;
+}
+
+const DEFAULT_RETENTION_DAYS = 365;
+
+// Prunes records older than `daysLimit` (defaults to data.retentionDays or 365).
+// A daysLimit of 0, null, or 'unlimited' skips pruning (infinite retention).
+// Returns the count of deleted records.
+function pruneOldDays(data, daysLimit) {
+  if (!data || !data.days) return 0;
+  const limit = daysLimit !== undefined ? daysLimit : (data.retentionDays ?? DEFAULT_RETENTION_DAYS);
+  if (!limit || limit <= 0 || limit === 'unlimited') return 0;
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - Number(limit));
+  const cutoffKey = todayKey(cutoff);
+
+  let prunedCount = 0;
+  for (const dayKey of Object.keys(data.days)) {
+    if (dayKey < cutoffKey) {
+      delete data.days[dayKey];
+      prunedCount++;
+    }
+  }
+  return prunedCount;
+}
+
+// Validates the root storage object and repairs all daily records.
+// Discards malformed date keys while recovering valid entries.
+function validateAndNormalizeData(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { retentionDays: DEFAULT_RETENTION_DAYS, days: {} };
+  }
+
+  let retentionDays = DEFAULT_RETENTION_DAYS;
+  if (raw.retentionDays === 0 || raw.retentionDays === 'unlimited' || raw.retentionDays === null) {
+    retentionDays = 0; // 0 represents unlimited retention
+  } else if (Number.isFinite(Number(raw.retentionDays)) && Number(raw.retentionDays) > 0) {
+    retentionDays = Math.floor(Number(raw.retentionDays));
+  }
+
+  const normalized = {
+    ...raw,
+    retentionDays,
+    days: {},
+  };
+
+  if (raw.days && typeof raw.days === 'object' && !Array.isArray(raw.days)) {
+    for (const [key, dayVal] of Object.entries(raw.days)) {
+      if (!DATE_KEY_REGEX.test(key) || isNaN(Date.parse(key))) {
+        console.warn(`[storage] Discarding invalid date key: "${key}"`);
+        continue;
+      }
+      normalized.days[key] = normalizeDay(dayVal);
+    }
+  }
+
+  return normalized;
+}
+
+function mergeDays(targetDay, sourceDay) {
+  const target = normalizeDay(targetDay);
+  const source = normalizeDay(sourceDay);
+
+  const merged = { ...emptyDay() };
+  merged.mousePixels = target.mousePixels + source.mousePixels;
+  merged.leftClicks = target.leftClicks + source.leftClicks;
+  merged.rightClicks = target.rightClicks + source.rightClicks;
+  merged.middleClicks = target.middleClicks + source.middleClicks;
+  merged.keyPresses = target.keyPresses + source.keyPresses;
+  merged.activeSeconds = target.activeSeconds + source.activeSeconds;
+  merged.idleSeconds = target.idleSeconds + source.idleSeconds;
+  merged.totalSeconds = target.totalSeconds + source.totalSeconds;
+  merged.peakSpeed = Math.max(target.peakSpeed, source.peakSpeed);
+
+  merged.keys = { ...target.keys };
+  for (const [k, count] of Object.entries(source.keys)) {
+    merged.keys[k] = (merged.keys[k] || 0) + count;
+  }
+
+  merged.apps = { ...target.apps };
+  for (const [appKey, secs] of Object.entries(source.apps)) {
+    merged.apps[appKey] = (merged.apps[appKey] || 0) + secs;
   }
 
   return merged;
@@ -82,9 +189,9 @@ function load() {
     if (fs.existsSync(DATA_FILE)) {
       const raw = fs.readFileSync(DATA_FILE, 'utf8');
       if (raw && raw.trim().length > 0) {
-        const data = JSON.parse(raw);
-        if (data && typeof data === 'object' && data.days) {
-          parsed = data;
+        const rawJson = JSON.parse(raw);
+        if (rawJson && typeof rawJson === 'object') {
+          parsed = validateAndNormalizeData(rawJson);
         }
       }
     }
@@ -98,11 +205,11 @@ function load() {
       console.warn('Attempting recovery from backup file:', BACKUP_FILE);
       const rawBak = fs.readFileSync(BACKUP_FILE, 'utf8');
       if (rawBak && rawBak.trim().length > 0) {
-        const dataBak = JSON.parse(rawBak);
-        if (dataBak && typeof dataBak === 'object' && dataBak.days) {
-          parsed = dataBak;
-          // Restore primary from backup
-          fs.writeFileSync(DATA_FILE, rawBak, 'utf8');
+        const rawJsonBak = JSON.parse(rawBak);
+        if (rawJsonBak && typeof rawJsonBak === 'object') {
+          parsed = validateAndNormalizeData(rawJsonBak);
+          // Restore primary from validated backup
+          save(parsed);
           console.warn('Successfully recovered activity data from backup file!');
         }
       }
@@ -112,7 +219,7 @@ function load() {
   }
 
   if (!parsed) {
-    parsed = { days: {} };
+    parsed = { retentionDays: DEFAULT_RETENTION_DAYS, days: {} };
   }
 
   // Automatic Migration: check old cursor-meter folder if not migrated yet
@@ -128,9 +235,13 @@ function load() {
       const oldRaw = fs.readFileSync(oldDataFile, 'utf8');
       const oldParsed = JSON.parse(oldRaw);
       if (oldParsed && oldParsed.days) {
-        for (const [dayKey, dayData] of Object.entries(oldParsed.days)) {
+        const normalizedOld = validateAndNormalizeData(oldParsed);
+        // Ensure migration never restores expired records:
+        pruneOldDays(normalizedOld, parsed.retentionDays);
+
+        for (const [dayKey, dayData] of Object.entries(normalizedOld.days)) {
           if (!parsed.days[dayKey]) {
-            parsed.days[dayKey] = { ...emptyDay(), ...dayData };
+            parsed.days[dayKey] = dayData;
           } else {
             parsed.days[dayKey] = mergeDays(parsed.days[dayKey], dayData);
           }
@@ -141,6 +252,13 @@ function load() {
     }
   } catch (err) {
     console.error('Migration error:', err);
+  }
+
+  // Prune expired historical records on startup and save cleaned data
+  const pruned = pruneOldDays(parsed);
+  if (pruned > 0) {
+    console.log(`[storage] Pruned ${pruned} historical record(s) older than ${parsed.retentionDays} days.`);
+    save(parsed);
   }
 
   return parsed;
@@ -171,7 +289,7 @@ function save(data) {
     } catch (renameErr) {
       // Windows file-locking fallback
       fs.copyFileSync(TEMP_FILE, DATA_FILE);
-      try { fs.unlinkSync(TEMP_FILE); } catch {}
+      try { fs.unlinkSync(TEMP_FILE); } catch { }
     }
     return true;
   } catch (err) {
@@ -181,9 +299,11 @@ function save(data) {
 }
 
 function getDay(data, key = todayKey()) {
-  if (!data.days[key]) data.days[key] = emptyDay();
-  if (!data.days[key].apps) data.days[key].apps = {};
-  if (!data.days[key].keys) data.days[key].keys = {};
+  if (!data.days[key]) {
+    data.days[key] = emptyDay();
+  } else if (!data.days[key].apps || !data.days[key].keys) {
+    data.days[key] = normalizeDay(data.days[key]);
+  }
   return data.days[key];
 }
 
@@ -260,6 +380,10 @@ module.exports = {
   save,
   todayKey,
   emptyDay,
+  normalizeDay,
+  validateAndNormalizeData,
+  pruneOldDays,
+  DEFAULT_RETENTION_DAYS,
   getDay,
   lastNDays,
   getAggregatedApps,
