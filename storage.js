@@ -97,18 +97,35 @@ function normalizeDay(rawDay) {
 }
 
 const DEFAULT_RETENTION_DAYS = 365;
+const MAX_RETENTION_DAYS = 3650; // 10 years maximum bounded retention (use 0 for unlimited)
 
 // Prunes records older than `daysLimit` (defaults to data.retentionDays or 365).
 // A daysLimit of 0, null, or 'unlimited' skips pruning (infinite retention).
+// Enforces a maximum bound of MAX_RETENTION_DAYS to prevent date overflow.
 // Returns the count of deleted records.
 function pruneOldDays(data, daysLimit) {
   if (!data || !data.days) return 0;
-  const limit = daysLimit !== undefined ? daysLimit : (data.retentionDays ?? DEFAULT_RETENTION_DAYS);
-  if (!limit || limit <= 0 || limit === 'unlimited') return 0;
+  const rawLimit = daysLimit !== undefined ? daysLimit : (data.retentionDays ?? DEFAULT_RETENTION_DAYS);
+  if (!rawLimit || rawLimit <= 0 || rawLimit === 'unlimited') return 0;
+
+  const numLimit = Number(rawLimit);
+  if (!Number.isFinite(numLimit) || numLimit <= 0) return 0;
+  const limit = Math.min(Math.floor(numLimit), MAX_RETENTION_DAYS);
 
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - Number(limit));
+  cutoff.setDate(cutoff.getDate() - limit);
+
+  // Safety guard: prevent date-math overflow/corruption from wiping records
+  if (isNaN(cutoff.getTime())) {
+    console.error('[storage] Invalid cutoff date generated; aborting prune to prevent accidental data loss.');
+    return 0;
+  }
+
   const cutoffKey = todayKey(cutoff);
+  if (!DATE_KEY_REGEX.test(cutoffKey)) {
+    console.error('[storage] Malformed cutoff key generated; aborting prune.');
+    return 0;
+  }
 
   let prunedCount = 0;
   for (const dayKey of Object.keys(data.days)) {
@@ -131,7 +148,7 @@ function validateAndNormalizeData(raw) {
   if (raw.retentionDays === 0 || raw.retentionDays === 'unlimited' || raw.retentionDays === null) {
     retentionDays = 0; // 0 represents unlimited retention
   } else if (Number.isFinite(Number(raw.retentionDays)) && Number(raw.retentionDays) > 0) {
-    retentionDays = Math.floor(Number(raw.retentionDays));
+    retentionDays = Math.min(Math.floor(Number(raw.retentionDays)), MAX_RETENTION_DAYS);
   }
 
   const normalized = {
@@ -184,14 +201,20 @@ function mergeDays(targetDay, sourceDay) {
 function load() {
   let parsed = null;
 
+  // Helper to check if a dataset contains actual daily activity records
+  const hasDays = (obj) => Boolean(obj && obj.days && typeof obj.days === 'object' && Object.keys(obj.days).length > 0);
+
   // 1. Try reading the primary DATA_FILE
   try {
     if (fs.existsSync(DATA_FILE)) {
       const raw = fs.readFileSync(DATA_FILE, 'utf8');
       if (raw && raw.trim().length > 0) {
         const rawJson = JSON.parse(raw);
-        if (rawJson && typeof rawJson === 'object') {
+        // Ensure it is structurally valid with an actual days object
+        if (rawJson && typeof rawJson === 'object' && rawJson.days && typeof rawJson.days === 'object' && !Array.isArray(rawJson.days)) {
           parsed = validateAndNormalizeData(rawJson);
+        } else {
+          console.warn('[storage] Primary data file is missing a valid "days" structure; checking backup for recovery.');
         }
       }
     }
@@ -199,22 +222,28 @@ function load() {
     console.error('Failed reading primary data file:', err);
   }
 
-  // 2. Auto-Recovery: if primary file was corrupted (e.g. from sudden PC restart/crash), recover from backup
-  if (!parsed && fs.existsSync(BACKUP_FILE)) {
-    try {
-      console.warn('Attempting recovery from backup file:', BACKUP_FILE);
-      const rawBak = fs.readFileSync(BACKUP_FILE, 'utf8');
-      if (rawBak && rawBak.trim().length > 0) {
-        const rawJsonBak = JSON.parse(rawBak);
-        if (rawJsonBak && typeof rawJsonBak === 'object') {
-          parsed = validateAndNormalizeData(rawJsonBak);
-          // Restore primary from validated backup
-          save(parsed);
-          console.warn('Successfully recovered activity data from backup file!');
+  // 2. Auto-Recovery: Recover from backup if:
+  //    a) Primary file failed to parse / read entirely (!parsed), OR
+  //    b) Primary file is empty / has 0 valid days, while backup contains historical records.
+  if (fs.existsSync(BACKUP_FILE)) {
+    const primaryEmpty = !hasDays(parsed);
+    if (!parsed || primaryEmpty) {
+      try {
+        const rawBak = fs.readFileSync(BACKUP_FILE, 'utf8');
+        if (rawBak && rawBak.trim().length > 0) {
+          const rawJsonBak = JSON.parse(rawBak);
+          if (rawJsonBak && typeof rawJsonBak === 'object') {
+            const parsedBak = validateAndNormalizeData(rawJsonBak);
+            if (hasDays(parsedBak)) {
+              console.warn('[storage] Primary file was empty or corrupted, but backup has valid history. Recovering from backup!');
+              parsed = parsedBak;
+              save(parsed);
+            }
+          }
         }
+      } catch (bakErr) {
+        console.error('Failed reading backup data file:', bakErr);
       }
-    } catch (bakErr) {
-      console.error('Failed reading backup data file:', bakErr);
     }
   }
 
@@ -384,6 +413,7 @@ module.exports = {
   validateAndNormalizeData,
   pruneOldDays,
   DEFAULT_RETENTION_DAYS,
+  MAX_RETENTION_DAYS,
   getDay,
   lastNDays,
   getAggregatedApps,

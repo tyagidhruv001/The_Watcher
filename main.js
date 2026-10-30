@@ -215,7 +215,7 @@ function buildStatsPayload() {
     instantSpeed: Math.round(instantSpeed),
     peakSpeed: day.peakSpeed || 0,
     apm: getApm(),
-    currentApp: lastCurrentApp,
+    currentApp: tracker && !tracker.isRunning() ? 'Paused' : lastCurrentApp,
   };
 }
 
@@ -337,7 +337,7 @@ if (!gotTheLock) {
       if (days === 'unlimited' || days === 0 || days === null) {
         data.retentionDays = 0; // 0 = unlimited
       } else if (Number.isFinite(parsedDays) && parsedDays > 0) {
-        data.retentionDays = Math.floor(parsedDays);
+        data.retentionDays = Math.min(Math.floor(parsedDays), storage.MAX_RETENTION_DAYS);
       } else {
         return data.retentionDays ?? storage.DEFAULT_RETENTION_DAYS;
       }
@@ -433,14 +433,17 @@ if (!gotTheLock) {
 
     if (tracker.isRunning()) {
       const activity = await windowTracker.pollActivity();
-      // Active/idle tracks YOUR input activity (typing, clicking).
-      // App foreground time is tracked always — even while idle/reading/watching.
+      // While tracking is active:
+      // - activeSeconds: increments when mouse/keyboard input is detected.
+      // - idleSeconds: increments during input inactivity (e.g. reading/watching videos).
+      // - Foreground app duration is tracked in both active and idle states.
+      // When tracking is PAUSED by the user, all polling and foreground app tracking is halted.
       if (activity.isIdle) {
         day.idleSeconds += seconds;
       } else {
         day.activeSeconds += seconds;
       }
-      // Always record which app is in the foreground, idle or not.
+      // Record foreground application time during active tracking:
       if (activity.exeKey) {
         day.apps[activity.exeKey] = (day.apps[activity.exeKey] || 0) + seconds;
         appsListDirty = true;
