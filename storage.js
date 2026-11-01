@@ -26,7 +26,40 @@ function todayKey(date = new Date()) {
   return `${y}-${m}-${d}`;
 }
 
-const DATE_KEY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const DATE_KEY_REGEX = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+// Validates that a YYYY-MM-DD string represents a real calendar date.
+// Rejects impossible dates like 2026-02-31 that Date.parse() would silently normalize.
+function isValidDateKey(key) {
+  const match = DATE_KEY_REGEX.exec(key);
+  if (!match) return false;
+
+  const year = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const day = parseInt(match[3], 10);
+
+  if (month < 1 || month > 12) return false;
+  if (day < 1) return false;
+
+  // Days-in-month lookup (index 0 unused; Feb placeholder is 28, adjusted below)
+  const daysInMonth = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+  // Leap year: divisible by 4, except centuries unless also divisible by 400
+  if (month === 2) {
+    const isLeap = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+    if (day > (isLeap ? 29 : 28)) return false;
+  } else {
+    if (day > daysInMonth[month]) return false;
+  }
+
+  // Final UTC round-trip guard: construct the date in UTC and verify it didn't shift
+  const utc = new Date(Date.UTC(year, month - 1, day));
+  if (utc.getUTCFullYear() !== year || utc.getUTCMonth() !== month - 1 || utc.getUTCDate() !== day) {
+    return false;
+  }
+
+  return true;
+}
 
 function toSafeNumber(val, defaultVal = 0) {
   const n = typeof val === 'number' ? val : Number(val);
@@ -122,7 +155,7 @@ function pruneOldDays(data, daysLimit) {
   }
 
   const cutoffKey = todayKey(cutoff);
-  if (!DATE_KEY_REGEX.test(cutoffKey)) {
+  if (!isValidDateKey(cutoffKey)) {
     console.error('[storage] Malformed cutoff key generated; aborting prune.');
     return 0;
   }
@@ -159,7 +192,7 @@ function validateAndNormalizeData(raw) {
 
   if (raw.days && typeof raw.days === 'object' && !Array.isArray(raw.days)) {
     for (const [key, dayVal] of Object.entries(raw.days)) {
-      if (!DATE_KEY_REGEX.test(key) || isNaN(Date.parse(key))) {
+      if (!isValidDateKey(key)) {
         console.warn(`[storage] Discarding invalid date key: "${key}"`);
         continue;
       }
@@ -237,7 +270,8 @@ function load() {
             if (hasDays(parsedBak)) {
               console.warn('[storage] Primary file was empty or corrupted, but backup has valid history. Recovering from backup!');
               parsed = parsedBak;
-              save(parsed);
+              // Restore primary from validated backup WITHOUT overwriting BACKUP_FILE with the corrupted DATA_FILE!
+              save(parsed, /* skipBackup = */ true);
             }
           }
         }
@@ -293,7 +327,7 @@ function load() {
   return parsed;
 }
 
-function save(data) {
+function save(data, skipBackup = false) {
   if (!data || !data.days) return false;
 
   try {
@@ -303,10 +337,16 @@ function save(data) {
     // 1. Write atomically to a temp file first
     fs.writeFileSync(TEMP_FILE, jsonStr, 'utf8');
 
-    // 2. Create/update a safety backup of the existing valid data file
-    if (fs.existsSync(DATA_FILE)) {
+    // 2. Create/update a safety backup of the existing data file ONLY if:
+    //    - Not explicitly skipped (essential during backup recovery to prevent
+    //      overwriting a valid backup with a corrupted primary file).
+    //    - DATA_FILE exists and is not zero-byte empty.
+    if (!skipBackup && fs.existsSync(DATA_FILE)) {
       try {
-        fs.copyFileSync(DATA_FILE, BACKUP_FILE);
+        const stat = fs.statSync(DATA_FILE);
+        if (stat.size > 0) {
+          fs.copyFileSync(DATA_FILE, BACKUP_FILE);
+        }
       } catch {
         // Non-fatal if backup copy fails
       }
@@ -410,6 +450,7 @@ module.exports = {
   todayKey,
   emptyDay,
   normalizeDay,
+  isValidDateKey,
   validateAndNormalizeData,
   pruneOldDays,
   DEFAULT_RETENTION_DAYS,

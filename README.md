@@ -1,165 +1,167 @@
 # The Watcher
 
-A personal input-activity and screen-time dashboard that tracks mouse distance, click counts, keystrokes, active/idle time, and foreground application usage on a live cybernetic HUD.
+A personal input-activity and screen-time dashboard that tracks cursor distance, clicks, keystrokes, active/idle time, and foreground application usage on a live cybernetic HUD.
 
-## Privacy, read this first
+Built with Electron, HTML/CSS/JavaScript, and Node.js. All data stays 100% local on your machine.
 
-This app uses a **global input hook** — the same low-level mechanism a
-keylogger uses — so it can count clicks and key presses even when its own
-window isn't focused. To keep that from turning into something creepy:
+---
 
-- It only ever stores **counts** (`Space: 412`, `leftClicks: 88`, ...). It
-  never reads, stores, or transmits the actual text you type.
-- Application usage is stored as **classified app key + seconds** (e.g.
-  `chrome.exe: 4820`). The app reads the foreground window title briefly to
-  distinguish selected PWAs (such as ChatGPT/Claude) and terminal sessions,
-  but it does **not** persist or transmit window titles or browser tab URLs.
-  This still means the app temporarily processes window-title text, so treat
-  foreground-app tracking as a privacy-sensitive feature.
-- Activity data stays in a local JSON file on your own machine
-  (`app.getPath('userData')/activity-data.json`); the app does not upload
-  telemetry. The UI uses local system fonts and makes no external font requests.
-- Only run this on your own machine, on your own account. If you share a
-  computer with someone else, tell them it's running.
+## Privacy & Security (Read This First)
 
-## What it does
+The Watcher uses a low-level global input hook ([`uiohook-napi`](https://www.npmjs.com/package/uiohook-napi)) to count clicks and keystrokes even when its own window is minimized or out of focus. Privacy was designed into the architecture from day one:
 
-- **Cursor Distance Today**: shown in pixels, meters, or km (with real-time speedometer & DPI calibration)
-- **Mouse Clicks**: left, right, and middle clicks with visual Left/Right click ratio map
-- **Keystrokes**: total keys typed, approximate word count (~5 chars/word), and top key breakdown
-- **Active Time, Idle Time & PC On Time**: tracks when you're actively working, idle (e.g. watching movies), and total uptime
-- **App Foreground Usage**: live tracking of which app is focused and for how long
-- **7-Day Trend Chart**: daily distance chart comparing the last 7 days with weekly totals
-- **Controls & Extras**: Pause/Resume, Mini HUD mode, Always-on-Top pin, Sound FX synthesizer, Themes, and Share Daily Report
+- **No Keylogging (Counts Only)**: The application **never** records, logs, or transmits what you type. Keystrokes are strictly recorded as aggregate counters per key name (e.g. `Space: 412`, `Enter: 88`). Sequence and timing order are never stored, meaning passwords, credit card numbers, and written messages **cannot be reconstructed**.
+- **No Window Titles or URLs Saved**: The active application tracker uses [`get-windows`](https://www.npmjs.com/package/get-windows) to identify the focused executable (e.g. `chrome.exe`, `code.exe`). Window titles are inspected only in-memory to classify recognized web applications (e.g. distinguishing a Claude or ChatGPT PWA from a generic browser tab). Window titles, website URLs, and document paths are **never persisted to disk or transmitted**.
+- **100% Local Storage**: All telemetry is saved exclusively to a local JSON file on your machine. There is **zero telemetry upload**, no analytics, and no remote server communication.
+- **Strict Content Security Policy (CSP)**: The renderer runs with Node integration disabled, context isolation enabled, and a strict CSP blocking remote network access (`connect-src 'none'`). All UI assets and fonts are local.
 
-## Tech stack
+---
 
-| Part               | Technology                          |
-|---------------------|-------------------------------------|
-| Shell                | Electron                            |
-| Input tracking       | [`uiohook-napi`](https://www.npmjs.com/package/uiohook-napi) (global mouse/keyboard hook) |
-| Idle detection        | Electron's built-in `powerMonitor.getSystemIdleTime()` — no extra package |
-| Active window         | [`get-windows`](https://www.npmjs.com/package/get-windows) (the current name for what used to be `active-win`) |
-| UI                    | Plain HTML/CSS/JS (no framework)    |
-| Storage               | JSON file (swap for SQLite if you want querying/history beyond a rolling window) |
-| Packaging             | `electron-builder`                  |
+## Features
 
-### Notes on the screen-time / app-usage pieces
+### Input Telemetry
+- **Cursor Distance**: Real-time odometer tracking cursor movement in pixels, meters, or kilometers.
+- **Live Speedometer & APM**: Real-time velocity gauge (with configurable units: px/s, m/s, km/h, mph), peak velocity today, and live Actions Per Minute (APM).
+- **Hardware DPI Calibration**: Calibrate your mouse sensor DPI (default: 1000 DPI, with presets from 400 to 3200 DPI) for accurate real-world distance calculation.
+- **Click Breakdown**: Tracks Left, Right, and Middle clicks, plus an interactive Left vs. Right click ratio map.
+- **Keystroke Analytics**: Total keystrokes typed today, estimated word count (~5 characters/word), and top key breakdown with held-key auto-repeat suppression.
 
-A few things I deliberately did differently from "the obvious plan" for this
-part, worth knowing about:
+### Time & Screen-Time Intelligence
+- **Active Time**: Tracks time where mouse or keyboard input was actively detected.
+- **Idle Time**: Uses Electron's native `powerMonitor.getSystemIdleTime()` to detect inactivity (> 2 minutes without input, e.g. watching video or reading).
+- **Laptop-On (PC Awake) Time**: Measures total session uptime independent of input or pause status.
+- **Top Applications**: Live tracking of the focused window executable and total active duration. View rankings across **Today**, **Yesterday**, **Last 7 Days**, **Last 30 Days**, or **All-Time**.
+- **7-Day Trend Chart**: Interactive daily distance history comparing the past 7 days against your personal daily average.
 
-- **No native Windows API code, no custom native addon.** You don't need to
-  write `GetForegroundWindow()`/`GetWindowThreadProcessId()` calls yourself —
-  `get-windows` already wraps the platform-specific work (Win32 on Windows,
-  Cocoa on macOS, X11 on Linux) behind one cross-platform `activeWindow()`
-  call. Same story for idle time: Electron's own `powerMonitor` already does
-  this, so there's no separate "systemIdle" native module to write either.
-- **`get-windows` is ESM-only.** The rest of this app is CommonJS
-  (`require`), and a plain `require('get-windows')` throws
-  `ERR_REQUIRE_ESM`. `windowTracker.js` loads it with a dynamic
-  `await import('get-windows')` instead — the standard way to pull an
-  ESM-only package into CJS code.
-- **App usage stores an app key, not window titles or URLs.** `windowTracker.js`
-  reads the foreground title temporarily for a narrow classification step
-  (for example, distinguishing ChatGPT/Claude PWAs inside a browser and
-  Claude Code in a terminal). The title itself is not written to the stats
-  file. `get-windows` is called with accessibility and screen-recording
-  permission requests disabled.
-- **Active-window polling runs every 2s, not 1s**, folded into the same
-  interval that already saves/pushes stats — one timer instead of several,
-  and it halves how often the (relatively expensive) native window lookup
-  runs. Mouse/key/click counting is unaffected — those are still
-  event-driven, not polled.
-- **Kept JSON storage, not SQLite.** The earlier plan's suggestion to move to
-  SQLite with four separate tables is reasonable if you want ad-hoc querying
-  over months of history, but it's more moving parts than this feature
-  currently needs — daily aggregates plus a 7-day rolling window are cheap
-  to compute from one JSON file. Worth revisiting if you add long-range
-  history/analytics later.
-- **Didn't adopt the deeper `src/services/…/database/…` folder split** from
-  that plan. The existing main.js/tracker.js/storage.js + preload.js split
-  already keeps system access out of the renderer (the important rule that
-  plan called out) — restructuring into a dozen folders for ~7 files would
-  be churn without benefit at this size. Reconsider once the app actually
-  grows into having several trackers, a real DB layer, and a component-based
-  UI.
-- **One sharp edge:** on Linux, `get-windows`' native dependency needs X11
-  dev headers to build from source (similar to what `uiohook-napi` needs).
-  If `npm install` fails specifically on `get-windows`, install your distro's
-  X11 development package (e.g. `libx11-dev`) first. This isn't an issue on
-  the prebuilt binaries Windows and macOS normally get.
+### User Controls & Customization
+- **Pause & Resume**: Temporarily halt all input and application tracking at any moment.
+- **System Tray Integration**: Background tracking with tray status (`Today: X.Xm · Live`), quick pause/resume toggle, and auto-start on Windows boot toggle.
+- **Global Hotkey**: Press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>M</kbd> anywhere in Windows to toggle the HUD.
+- **Theme Engine**: 6 cyberpunk/neon palettes (Cyber, Amber, Emerald, Violet, Crimson, Midnight) with instant switching.
+- **Audio Synthesizer**: Optional Web Audio API click/odometer sound effects with adjustable volume.
+- **Share Summary**: One-click formatted daily summary copied to clipboard for standups or daily logs.
+- **Safe 2-Step Reset**: Reset today's live counters without affecting historical days.
 
-## Security and performance notes
+---
 
-- The renderer runs with context isolation, Node integration disabled, and
-  Chromium sandboxing enabled. IPC handlers accept calls only from the main
-  application frame, and the preload exposes narrow, named operations.
-- A Content Security Policy blocks scripts, network connections, and remote
-  resources. The interface uses local system fonts and does not contact Google
-  Fonts or other third-party font servers.
-- App and key labels loaded from local data are HTML-escaped before rendering.
-- Active-window polling is guarded against overlapping asynchronous calls;
-  delayed timer callbacks are capped so a sleep/resume gap cannot add hours to
-  a single activity bucket. App-list aggregation is cached between polls.
-- Saves report success/failure so a failed disk write does not silently clear
-  the dirty flag. A backup and temporary-file replacement remain in place.
+## Tracking States & Privacy Controls
 
-## Setup
+| Component / Metric | Live (Running) | Paused (Soft Pause) | Stopped / Revoked (Hard Stop) | Idle (> 2m Inactivity) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Native Hook (`uIOhook`)** | **Running** | **Standby** | **Completely Uninstalled** | **Running** |
+| **Input Counters** | **Active** | **Halted** (events discarded) | **Halted** (listeners detached) | **Active** (awaits next input) |
+| **Foreground App Polling** | **Active** (every 2s) | **Halted** | **Halted** | **Active** (tracks idle app time) |
+| **Active Seconds** | Accumulating | Frozen | Frozen | Frozen |
+| **Idle Seconds** | Frozen | Frozen | Frozen | Accumulating |
+| **Laptop-On Time** | Accumulating | **Accumulating** | **Accumulating** (if app is open) | Accumulating |
+| **Current App Badge** | Focused App Name | **`'Paused'`** | **`'Paused'`** | Focused App Name |
+| **Status Pill (HUD)** | `LIVE` | `PAUSED` | `PAUSED` | `LIVE` |
+| **Tray Menu & Hotkey** | Functional | Functional | Functional | Functional |
 
+### Pause vs. Stop Lifecycle
+- **Pause (Soft Pause)**: Setting the dashboard or tray to "Pause" suppresses all event counting and halts foreground app polling. The native hook remains on standby to ensure instantaneous (0ms) resumption without Windows hook churn. Coordinate anchors are wiped so resuming never records false cursor "teleport" distance spikes.
+- **Stop / Revocation (Hard Stop)**: Triggered during app exit or when tracking is explicitly terminated. `uIOhook.stop()` is called, completely unregistering low-level hooks from the Windows kernel/user32 hook chain and detaching all listeners. Historical data remains safe and preserved on disk.
+
+---
+
+## Data Storage & Retention Policy
+
+### Storage Location
+All data is stored in a clean, human-readable JSON database on your local drive:
+- **Windows**: `%APPDATA%\the-watcher\activity-data.json`
+- **macOS**: `~/Library/Application Support/the-watcher/activity-data.json`
+- **Linux**: `~/.config/the-watcher/activity-data.json`
+
+### Storage Resilience & Auto-Recovery
+- **Atomic Writes**: Writes first to a `.tmp` file and atomically replaces the primary file, preventing corruption during power cuts or crashes.
+- **Automated Backup**: Generates an `activity-data.json.bak` safety copy before updates.
+- **Corrupted File Recovery**: If the primary file is ever damaged or empty, the app automatically recovers validated historical records from the backup without overwriting the backup with corrupted data.
+- **Strict Date Validation**: Validates all dates as genuine calendar dates (`YYYY-MM-DD`), correctly handling leap years and rejecting impossible dates (e.g. Feb 31).
+
+### Configurable Data Retention
+- Configurable retention periods: **30 days**, **90 days**, **180 days**, **365 days** (default), or **0** for unlimited history.
+- Automatically prunes expired historical records on startup and upon updating retention settings.
+- Bounded at a safe maximum of 3,650 days (10 years) with date overflow protection.
+
+---
+
+## Installation & Development
+
+### Prerequisites
+- [Node.js](https://nodejs.org/) (version 18, 20, or 22+ recommended)
+- `npm`
+
+### Setup
 ```bash
+# Clone the repository
+git clone https://github.com/tyagidhruv001/The_Watcher.git
+cd TheWatcher
+
+# Install dependencies
 npm install
+
+# Run application in development mode
 npm start
 ```
 
-`uiohook-napi` ships prebuilt binaries for the common platforms, so
-`npm install` should just work. If it tries to compile from source and fails,
-you're missing build tools for your OS (Xcode Command Line Tools on macOS,
-`build-essential` + `python3` on Linux, `windows-build-tools`/Visual Studio
-Build Tools on Windows).
+### Running Tests
+The test suite uses Node.js's native test runner (`node:test` and `node:assert/strict`) with zero external testing dependencies:
 
-### OS permissions
+```bash
+npm test
+```
 
-- **macOS**: the first time you run it, macOS will ask you to grant
-  **Accessibility** (and sometimes **Input Monitoring**) permission under
-  *System Settings → Privacy & Security*. Without it, the hook silently sees
-  nothing.
-- **Windows**: no special permission is normally needed, but some antivirus
-  tools flag global input hooks — that's expected for this category of app,
-  not a sign of a real problem.
-- **Linux**: needs an X11 session (Wayland support for global hooks is
-  spottier depending on your compositor).
+Runs 32 automated tests covering:
+- Storage serialization, schema normalization, and atomic file recovery.
+- Strict calendar date validation and leap year handling.
+- 30-day and unlimited data retention pruning.
+- Tracker lifecycle management (start, pause, resume, stop, restart, double-stop).
+- Singleton tracker enforcement and listener deduplication.
+- Live Windows native hook integration.
+- Single-source-of-truth version consistency.
 
-## Building an installer
+### Building an Installer
+To package the app into a standalone production installer:
 
 ```bash
 npm run build
 ```
 
-Produces an installer in `dist/` (`.exe`/NSIS on Windows by default — see
-`build.mac`/`build.linux` in `package.json` for other targets).
+Generates a Windows NSIS installer in the `dist/` directory (e.g. `The Watcher Setup 1.4.0.exe`).
 
-## How it's structured
+---
+
+## Project Structure
 
 ```
-main.js        Electron entry point — owns the window, the tracker, and IPC
-tracker.js     Wraps uiohook-napi: raw events -> distance/click/key deltas
-storage.js     Reads/writes the daily JSON stats file
-preload.js     contextBridge: exposes a small safe API to the UI
-index.html     Dashboard markup
-styles.css     Dashboard styling
-renderer.js    Dashboard behavior (no direct Node access — uses window.api)
+TheWatcher/
+├── main.js             # Electron main process (lifecycle, IPC, window management, tray)
+├── tracker.js          # Input tracking wrapper around uiohook-napi (singleton state machine)
+├── windowTracker.js    # Foreground application detection & classification via get-windows
+├── storage.js          # Persistence, backup recovery, schema normalization, and retention
+├── appNames.js         # Process executable to friendly display name mapping table
+├── preload.js          # Secure contextBridge API exposed to the renderer
+├── index.html          # Cybernetic HUD markup
+├── styles.css          # Cyberpunk styling, responsive layouts, and animations
+├── renderer.js         # Dashboard UI controller, charts, themes, and sound effects
+└── test/
+    ├── storage.test.js # Persistence, validation, recovery, and retention tests
+    ├── tracker.test.js # Tracker lifecycle, pause/resume, and singleton tests
+    └── version.test.js # Metadata and version consistency tests
 ```
 
-Design choice: `uiohook-napi` and file access only ever run in the main
-process. The renderer (the actual window UI) only talks to `window.api`,
-which is the small set of functions `preload.js` exposes. That keeps the
-window's web content from ever getting raw Node/OS access.
+---
 
-## Possible future extensions
+## Platform Notes & Permissions
 
-- CSV export of daily and per-app history.
-- Optional retention controls to delete old daily records automatically.
-- A visible privacy indicator and a first-run consent screen explaining the
-  global input hook and temporary foreground-title classification.
-- SQLite if long-range history or multi-year analytics outgrow JSON storage.
+- **Windows**: No special OS permissions required. Some aggressive antivirus tools may flag global keyboard/mouse hooks (`WH_KEYBOARD_LL`). This is a standard heuristic false positive for global input trackers.
+- **macOS**: Requires explicit **Accessibility** and **Input Monitoring** permissions in *System Settings → Privacy & Security*.
+- **Linux**: Requires an **X11** desktop session. Global input hooks under Wayland are restricted by compositor security models.
+
+---
+
+## Roadmap
+
+- [ ] Export daily and per-app history to CSV / JSON.
+- [ ] Custom date-range picker for long-term trend analysis.
+- [ ] Configurable idle timeout threshold directly from the settings drawer.
