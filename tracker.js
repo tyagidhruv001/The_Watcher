@@ -4,6 +4,17 @@
 // This module never reads or stores what was typed. It does hand each key
 // name to onKey as it happens, though, so keeping typed text out of storage
 // depends on what that callback does with them (count them; don't log order).
+//
+// LIFECYCLE & PRIVACY STATES:
+// - LIVE: Hook active, events counted, foreground app polling active.
+// - PAUSED (Soft Pause): Temporary user suspension. Events are discarded at the
+//   first line of each callback without processing. Cursor coordinates and held
+//   keys are wiped so resume never creates teleport distance or stuck key events.
+//   Native hook remains on standby to ensure instantaneous (0ms) resumption
+//   without OS hook registration churn or message-pump stutter.
+// - STOPPED / REVOKED (Hard Stop): Full shutdown. The native OS hook is completely
+//   stopped via hook.stop(), all event listeners are detached via hook.off(), and
+//   the singleton reference is released. No native OS hook remains registered.
 
 const { uIOhook, UiohookKey } = require('uiohook-napi');
 
@@ -35,15 +46,19 @@ const BUTTON_FIELDS = {
 // Module-level tracking for process exit cleanup
 let activeTracker = null;
 let exitHandlerRegistered = false;
+let exitHandler = null;
 
 function ensureExitCleanup() {
   if (exitHandlerRegistered) return;
   exitHandlerRegistered = true;
-  process.once('exit', () => {
+  exitHandler = () => {
+    exitHandlerRegistered = false;
+    exitHandler = null;
     if (activeTracker) {
       activeTracker.stop();
     }
-  });
+  };
+  process.once('exit', exitHandler);
 }
 
 /**
@@ -52,9 +67,14 @@ function ensureExitCleanup() {
  * @param {{onDistance: (d: number) => void,
  *          onClick: (field: string) => void,
  *          onKey: (name: string) => void}} callbacks
+ * @param {object} [hook=uIOhook] - Optional hook instance for testing
  * @returns {Tracker}
  */
-function createTracker({ onDistance, onClick, onKey }) {
+function createTracker({ onDistance, onClick, onKey }, hook = uIOhook) {
+  if (activeTracker) {
+    throw new Error('A tracker instance already exists. The application enforces a singleton tracker lifecycle. Call stop() on the active tracker before creating a new one.');
+  }
+
   let running = false;
   let started = false;
 
@@ -99,7 +119,7 @@ function createTracker({ onDistance, onClick, onKey }) {
     ensureExitCleanup();
     if (started) return;
     try {
-      uIOhook.start();
+      hook.start();
     } catch (err) {
       const wrapped = new Error(`Failed to initialise input hook: ${err.message}`);
       wrapped.cause = err;
@@ -107,16 +127,19 @@ function createTracker({ onDistance, onClick, onKey }) {
       throw wrapped;
     }
     for (const [event, fn] of listenerEntries) {
-      uIOhook.on(event, fn);
+      hook.on(event, fn);
     }
     started = true;
   }
 
   const tracker = {
     start() {
+      if (activeTracker && activeTracker !== tracker) {
+        throw new Error('Cannot start tracker: another tracker instance is currently active.');
+      }
+      activeTracker = tracker;
       ensureHook();
       running = true;
-      activeTracker = tracker;
     },
 
     pause() {
@@ -126,10 +149,13 @@ function createTracker({ onDistance, onClick, onKey }) {
     },
 
     resume() {
+      if (activeTracker && activeTracker !== tracker) {
+        throw new Error('Cannot resume tracker: another tracker instance is currently active.');
+      }
+      activeTracker = tracker;
       hasLastPos = false;
       ensureHook();
       running = true;
-      activeTracker = tracker;
     },
 
     isRunning() {
@@ -143,12 +169,12 @@ function createTracker({ onDistance, onClick, onKey }) {
 
       if (started) {
         try {
-          uIOhook.stop();
+          hook.stop();
         } catch (err) {
           console.warn('[tracker] uIOhook.stop() error during stop():', err);
         }
         for (const [event, fn] of listenerEntries) {
-          uIOhook.off(event, fn);
+          hook.off(event, fn);
         }
         started = false;
       }
@@ -159,7 +185,20 @@ function createTracker({ onDistance, onClick, onKey }) {
     },
   };
 
+  activeTracker = tracker;
+  ensureExitCleanup();
   return tracker;
 }
 
-module.exports = { createTracker };
+module.exports = {
+  createTracker,
+  getActiveTracker: () => activeTracker,
+  _resetExitCleanup: () => {
+    if (exitHandlerRegistered && exitHandler) {
+      process.removeListener('exit', exitHandler);
+      exitHandler = null;
+    }
+    exitHandlerRegistered = false;
+    activeTracker = null;
+  },
+};

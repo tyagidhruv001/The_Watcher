@@ -1,11 +1,13 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, globalShortcut, powerMonitor } = require('electron');
 const path = require('path');
+const pkg = require('./package.json');
 const storage = require('./storage');
 const { createTracker } = require('./tracker');
 const windowTracker = require('./windowTracker');
 const { friendlyName } = require('./appNames');
 
 const DEFAULT_DPI = 1000;
+const APP_VERSION = (app && typeof app.getVersion === 'function' && app.getVersion()) ? app.getVersion() : pkg.version;
 const FAST_TICK_MS = 200; // 5 times/second for live speed and APM when window is visible
 const SLOW_TICK_MS = 2000; // 2 seconds for app window polling
 const DISK_SAVE_INTERVAL_MS = 10000; // Save to disk at most every 10s if dirty (safer against crashes)
@@ -216,6 +218,7 @@ function buildStatsPayload() {
     peakSpeed: day.peakSpeed || 0,
     apm: getApm(),
     currentApp: tracker && !tracker.isRunning() ? 'Paused' : lastCurrentApp,
+    version: APP_VERSION,
   };
 }
 
@@ -254,11 +257,15 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
+    if (process.platform === 'win32') {
+      app.setAppUserModelId(pkg.build?.appId || 'com.thewatcher.app');
+    }
     data = storage.load();
     const updateTray = setupTray();
 
     // Register all IPC Handlers BEFORE creating window to guarantee zero race condition
     handleTrusted('get-stats', () => buildStatsPayload());
+    handleTrusted('get-version', () => APP_VERSION);
 
     handleTrusted('toggle-running', () => {
       if (tracker && tracker.isRunning()) tracker.pause();

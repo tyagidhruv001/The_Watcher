@@ -34,6 +34,10 @@ const state = {
   },
 };
 
+if (typeof window !== 'undefined') {
+  window.state = state;
+}
+
 let historyCache = [];
 let appsCache = [];
 let lastAppsFetchTime = 0;
@@ -146,6 +150,7 @@ function getMilestone(meters) {
 // --------------------------------------------------------------------------
 const els = {
   // Navigation & Header
+  versionBadge: document.getElementById('versionBadge') || document.querySelector('.brand-version-badge'),
   currentAppBadge: document.getElementById('currentAppBadge'),
   statusBadge: document.getElementById('statusBadge'),
   statusText: document.getElementById('statusText'),
@@ -171,6 +176,7 @@ const els = {
   milestoneDesc: document.getElementById('milestoneDesc'),
   milestonePct: document.getElementById('milestonePct'),
   milestoneProgress: document.getElementById('milestoneProgress'),
+  milestoneProgressBar: document.getElementById('milestoneProgressBar'),
   milestoneRemaining: document.getElementById('milestoneRemaining'),
 
   speedBox: document.getElementById('speedBox'),
@@ -320,6 +326,10 @@ function render() {
   els.milestoneDesc.textContent = milestone.text;
   els.milestonePct.textContent = `${Math.round(milestone.percent)}%`;
   els.milestoneProgress.style.width = `${milestone.percent}%`;
+  if (els.milestoneProgressBar) {
+    els.milestoneProgressBar.setAttribute('aria-valuenow', Math.round(milestone.percent));
+    els.milestoneProgressBar.setAttribute('aria-valuetext', `${Math.round(milestone.percent)}% of ${milestone.text}`);
+  }
   if (els.milestoneRemaining) {
     els.milestoneRemaining.textContent = milestone.remainingText;
   }
@@ -380,8 +390,11 @@ function render() {
   // 5. Header State & Live Indicator
   if (state.running) {
     els.statusBadge.className = 'status-pill live';
+    els.statusBadge.setAttribute('aria-label', 'System telemetry is active');
     els.statusText.textContent = 'LIVE';
     els.toggleText.textContent = 'Pause';
+    els.toggle.setAttribute('aria-label', 'Pause tracking');
+    els.toggle.setAttribute('aria-pressed', 'false');
     els.toggle.className = 'btn btn-action-primary';
     els.toggleIcon.innerHTML = `
       <rect x="6" y="4" width="4" height="16" rx="1"></rect>
@@ -389,8 +402,11 @@ function render() {
     `;
   } else {
     els.statusBadge.className = 'status-pill paused';
+    els.statusBadge.setAttribute('aria-label', 'System telemetry is paused');
     els.statusText.textContent = 'PAUSED';
     els.toggleText.textContent = 'Resume';
+    els.toggle.setAttribute('aria-label', 'Resume tracking');
+    els.toggle.setAttribute('aria-pressed', 'true');
     els.toggle.className = 'btn btn-action-primary paused-state';
     els.toggleIcon.innerHTML = `<polygon points="5 3 19 12 5 21 5 3"></polygon>`;
   }
@@ -444,7 +460,7 @@ function renderApps() {
           const isCurrent = state.currentApp && state.currentApp.toLowerCase() === rawName.toLowerCase();
           return `
             <li class="visual-item">
-              <div class="item-fill" style="width: ${pct}%"></div>
+              <div class="item-fill" data-pct="${pct}"></div>
               <div class="item-front">
                 <span class="item-tag">${initial}</span>
                 <span class="item-text" title="${escapeHtml(a.key || name)}">${name}</span>
@@ -455,6 +471,11 @@ function renderApps() {
           `;
         })
         .join('');
+
+      // Apply dynamic width via CSSOM rather than inline style attribute
+      els.topApps.querySelectorAll('.item-fill').forEach((el) => {
+        el.style.width = `${el.dataset.pct}%`;
+      });
     }
   } catch (err) {
     console.error('renderApps error:', err);
@@ -481,7 +502,7 @@ function renderKeys() {
           const pct = Math.min(100, Math.round((count / maxCount) * 100));
           return `
             <li class="visual-item">
-              <div class="item-fill" style="width: ${pct}%"></div>
+              <div class="item-fill" data-pct="${pct}"></div>
               <div class="item-front">
                 <span class="keycap-badge">${safeKey}</span>
                 <span class="item-text">${safeKey} key</span>
@@ -491,6 +512,11 @@ function renderKeys() {
           `;
         })
         .join('');
+
+      // Apply dynamic width via CSSOM rather than inline style attribute
+      els.topKeys.querySelectorAll('.item-fill').forEach((el) => {
+        el.style.width = `${el.dataset.pct}%`;
+      });
     }
   } catch (err) {
     console.error('renderKeys error:', err);
@@ -518,58 +544,133 @@ function renderMouseMap() {
 // --------------------------------------------------------------------------
 function getMetricValue(day, metric) {
   if (!day) return 0;
+  let val = 0;
   if (metric === 'clicks') {
-    return (day.leftClicks || 0) + (day.rightClicks || 0) + (day.middleClicks || 0);
+    val = (Number(day.leftClicks) || 0) + (Number(day.rightClicks) || 0) + (Number(day.middleClicks) || 0);
+  } else if (metric === 'keys') {
+    val = Number(day.keyPresses) || 0;
+  } else if (metric === 'time') {
+    val = Math.round((Number(day.activeSeconds) || 0) / 60); // minutes
+  } else {
+    // Default: distance in meters
+    const dpi = (typeof state !== 'undefined' && state.dpi > 0) ? state.dpi : 1000;
+    val = pixelsToDisplay(Number(day.mousePixels) || 0, 'm', dpi).value;
   }
-  if (metric === 'keys') {
-    return day.keyPresses || 0;
-  }
-  if (metric === 'time') {
-    return Math.round((day.activeSeconds || 0) / 60); // minutes
-  }
-  // Default: distance in meters
-  return pixelsToDisplay(day.mousePixels || 0, 'm', state.dpi).value;
+  return Number.isFinite(val) && val >= 0 ? val : 0;
 }
 
 function formatMetricDisplay(val, metric) {
+  const num = Number(val);
+  const safeVal = Number.isFinite(num) && num >= 0 ? num : 0;
+
   if (metric === 'dist') {
-    if (val >= 1000) return `${(val / 1000).toFixed(2)} km`;
-    return `${val.toFixed(0)} m`;
+    if (safeVal >= 1000000) return `${(safeVal / 1000000).toFixed(2)}M m`;
+    if (safeVal >= 1000) return `${(safeVal / 1000).toFixed(2)} km`;
+    return `${safeVal.toFixed(0)} m`;
   }
   if (metric === 'time') {
-    return formatDuration(val * 60);
+    return formatDuration(safeVal * 60);
   }
-  return val.toLocaleString();
+  if (metric === 'clicks' || metric === 'keys') {
+    if (safeVal >= 10000000) return `${(safeVal / 1000000).toFixed(1)}M`;
+    return Math.round(safeVal).toLocaleString();
+  }
+  return Math.round(safeVal).toLocaleString();
+}
+
+function colorWithAlpha(color, alphaHex = '44') {
+  if (!color || typeof color !== 'string') return '#00f5d4' + alphaHex;
+  const c = color.trim();
+  if (c.startsWith('#')) {
+    if (c.length === 7) return c + alphaHex;
+    if (c.length === 4) return `#${c[1]}${c[1]}${c[2]}${c[2]}${c[3]}${c[3]}${alphaHex}`;
+    if (c.length === 9) return c.slice(0, 7) + alphaHex;
+  }
+  if (c.startsWith('rgb(')) {
+    return c.replace('rgb(', 'rgba(').replace(')', ', 0.27)');
+  }
+  if (c.startsWith('rgba(')) {
+    return c;
+  }
+  return c;
+}
+
+function renderChartEmptyState(ctx, width, height) {
+  ctx.clearRect(0, 0, width, height);
+
+  // Subtle dotted reference line
+  ctx.save();
+  ctx.beginPath();
+  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+  ctx.lineWidth = 1;
+  ctx.moveTo(16, height / 2);
+  ctx.lineTo(width - 16, height / 2);
+  ctx.stroke();
+
+  // Clean empty state label
+  ctx.fillStyle = '#64748b';
+  ctx.font = '600 10px "JetBrains Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('NO ACTIVITY HISTORY RECORDED YET', width / 2, height / 2 - 8);
+
+  ctx.font = '400 9px "Inter", sans-serif';
+  ctx.fillStyle = '#475569';
+  ctx.fillText('Activity trends will populate as data is recorded', width / 2, height / 2 + 8);
+  ctx.restore();
+
+  if (els.trendTotalVal) els.trendTotalVal.textContent = '--';
+  if (els.trendAvgVal) els.trendAvgVal.textContent = '--';
+  if (els.trendPeakVal) els.trendPeakVal.textContent = '--';
+  if (els.chartTooltip) els.chartTooltip.classList.add('hidden');
+  updateDayInspector(null);
 }
 
 function drawChart(history) {
-  if (!history || !history.length) return;
+  if (Array.isArray(history)) {
+    historyCache = history;
+  }
   const canvas = els.chart;
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
+  if (!ctx) return;
 
   const rect = canvas.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
-  const width = rect.width || 340;
-  const height = rect.height || 105;
+  const width = Math.max(rect.width || 340, 50);
+  const height = Math.max(rect.height || 105, 50);
 
-  canvas.width = width * dpr;
-  canvas.height = height * dpr;
+  canvas.width = Math.round(width * dpr);
+  canvas.height = Math.round(height * dpr);
   ctx.scale(dpr, dpr);
   ctx.clearRect(0, 0, width, height);
 
+  if (!history || !history.length) {
+    renderChartEmptyState(ctx, width, height);
+    return;
+  }
+
   const displayList = history.slice(-state.trendRange);
+  if (!displayList.length) {
+    renderChartEmptyState(ctx, width, height);
+    return;
+  }
+
   const values = displayList.map((d) => getMetricValue(d, state.trendMetric));
-  const maxVal = Math.max(...values, 1);
+  const rawMax = Math.max(...values, 0);
+  const maxVal = rawMax > 0 ? rawMax : 1;
   const paddingBottom = 22;
-  const paddingTop = 12;
-  const chartHeight = height - paddingBottom - paddingTop;
-  const stepX = (width - 32) / Math.max(displayList.length - 1, 1);
+  const paddingTop = 14;
+  const paddingLeft = 20;
+  const paddingRight = 20;
+  const chartWidth = Math.max(width - paddingLeft - paddingRight, 10);
+  const chartHeight = Math.max(height - paddingBottom - paddingTop, 10);
 
   // Calculate KPIs
   let totalMetric = 0;
   let peakVal = 0;
-  let peakDay = null;
+  let peakDay = displayList[0];
   displayList.forEach((d, i) => {
     const v = values[i];
     totalMetric += v;
@@ -579,16 +680,26 @@ function drawChart(history) {
     }
   });
 
-  const avgVal = totalMetric / Math.max(displayList.length, 1);
-  els.trendTotalVal.textContent = formatMetricDisplay(totalMetric, state.trendMetric);
-  els.trendAvgVal.textContent = formatMetricDisplay(avgVal, state.trendMetric);
-  els.trendPeakVal.textContent = formatMetricDisplay(peakVal, state.trendMetric);
+  const avgVal = totalMetric / displayList.length;
+  if (els.trendTotalVal) els.trendTotalVal.textContent = formatMetricDisplay(totalMetric, state.trendMetric);
+  if (els.trendAvgVal) els.trendAvgVal.textContent = formatMetricDisplay(avgVal, state.trendMetric);
+  if (els.trendPeakVal) els.trendPeakVal.textContent = formatMetricDisplay(peakVal, state.trendMetric);
+
+  const isSingle = displayList.length === 1;
+  const stepX = isSingle ? 0 : chartWidth / (displayList.length - 1);
 
   // Compute point coordinates
   const points = displayList.map((d, i) => {
-    const x = 16 + i * stepX;
-    const y = paddingTop + chartHeight - (values[i] / maxVal) * chartHeight;
-    return { x, y, day: d, val: values[i], isToday: i === displayList.length - 1 };
+    const x = isSingle ? width / 2 : paddingLeft + i * stepX;
+    const ratio = rawMax > 0 ? (values[i] / maxVal) : 0;
+    const y = paddingTop + chartHeight - ratio * chartHeight;
+    return {
+      x,
+      y,
+      day: d,
+      val: values[i],
+      isToday: i === displayList.length - 1
+    };
   });
 
   // Draw Gridlines
@@ -597,15 +708,15 @@ function drawChart(history) {
   [0, 0.5, 1].forEach((ratio) => {
     const lineY = paddingTop + chartHeight * ratio;
     ctx.beginPath();
-    ctx.moveTo(16, lineY);
-    ctx.lineTo(width - 16, lineY);
+    ctx.moveTo(paddingLeft - 4, lineY);
+    ctx.lineTo(width - paddingRight + 4, lineY);
     ctx.stroke();
   });
 
-  const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#00f5d4';
+  const accentColor = (getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()) || '#00f5d4';
 
-  // Area Fill under curve
   if (points.length > 1) {
+    // Area Fill under curve
     ctx.beginPath();
     ctx.moveTo(points[0].x, paddingTop + chartHeight);
     ctx.lineTo(points[0].x, points[0].y);
@@ -614,7 +725,8 @@ function drawChart(history) {
       const p0 = points[i];
       const p1 = points[i + 1];
       const midX = (p0.x + p1.x) / 2;
-      ctx.quadraticCurveTo(p0.x, p0.y, midX, (p0.y + p1.y) / 2);
+      const midY = (p0.y + p1.y) / 2;
+      ctx.quadraticCurveTo(p0.x, p0.y, midX, midY);
     }
     const lastP = points[points.length - 1];
     ctx.lineTo(lastP.x, lastP.y);
@@ -622,7 +734,7 @@ function drawChart(history) {
     ctx.closePath();
 
     const areaGrad = ctx.createLinearGradient(0, paddingTop, 0, paddingTop + chartHeight);
-    areaGrad.addColorStop(0, accentColor + '44');
+    areaGrad.addColorStop(0, colorWithAlpha(accentColor, '33'));
     areaGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = areaGrad;
     ctx.fill();
@@ -634,7 +746,8 @@ function drawChart(history) {
       const p0 = points[i];
       const p1 = points[i + 1];
       const midX = (p0.x + p1.x) / 2;
-      ctx.quadraticCurveTo(p0.x, p0.y, midX, (p0.y + p1.y) / 2);
+      const midY = (p0.y + p1.y) / 2;
+      ctx.quadraticCurveTo(p0.x, p0.y, midX, midY);
     }
     ctx.lineTo(lastP.x, lastP.y);
     ctx.strokeStyle = accentColor;
@@ -643,6 +756,17 @@ function drawChart(history) {
     ctx.shadowBlur = 8;
     ctx.stroke();
     ctx.shadowBlur = 0;
+  } else {
+    // Single data point: subtle horizontal reference guideline at point level
+    ctx.save();
+    ctx.beginPath();
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = colorWithAlpha(accentColor, '44');
+    ctx.lineWidth = 1;
+    ctx.moveTo(paddingLeft, points[0].y);
+    ctx.lineTo(width - paddingRight, points[0].y);
+    ctx.stroke();
+    ctx.restore();
   }
 
   // Draw points & date labels
@@ -658,12 +782,28 @@ function drawChart(history) {
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    // Date text
-    const dateStr = p.day.date ? p.day.date.slice(5) : '';
-    ctx.fillStyle = isSelected ? '#ffffff' : '#64748b';
-    ctx.font = '600 9px "JetBrains Mono", monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(dateStr, p.x, height - 6);
+    // Date label decluttering: prevent overlapping when stepX is narrow
+    let showLabel = true;
+    if (!isSingle) {
+      const isLast = idx === points.length - 1;
+      if (stepX < 20) {
+        // Very tight: show every 3rd, avoiding collision with last point
+        showLabel = isSelected || isLast || (idx % 3 === 0 && idx < points.length - 2);
+      } else if (stepX < 38) {
+        // Tight (e.g. 14 points): show every 2nd, avoiding collision with last point
+        showLabel = isSelected || isLast || (idx % 2 === 0 && idx < points.length - 2);
+      }
+    }
+
+    if (showLabel) {
+      const dateStr = p.day.date ? p.day.date.slice(5) : (p.isToday ? 'Today' : '');
+      if (dateStr) {
+        ctx.fillStyle = isSelected ? '#ffffff' : '#64748b';
+        ctx.font = isSelected ? '700 9px "JetBrains Mono", monospace' : '500 9px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(dateStr, p.x, height - 6);
+      }
+    }
   });
 
   // Update Day Inspector with selected or current day
@@ -675,32 +815,49 @@ function drawChart(history) {
 }
 
 function updateDayInspector(day) {
-  if (!day) return;
+  if (!day) {
+    if (els.detailDayTitle) els.detailDayTitle.textContent = "Today's Live Record";
+    if (els.detailDayBadge) {
+      els.detailDayBadge.textContent = 'LIVE';
+      els.detailDayBadge.className = 'trend-badge';
+    }
+    if (els.detailDist) els.detailDist.textContent = '0 m';
+    if (els.detailClicks) els.detailClicks.textContent = '0';
+    if (els.detailKeys) els.detailKeys.textContent = '0';
+    if (els.detailTime) els.detailTime.textContent = '0s';
+    if (els.detailApp) els.detailApp.textContent = 'None';
+    return;
+  }
+
   const now = new Date();
   const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const isToday = !day.date || day.date === localToday;
-  els.detailDayTitle.textContent = isToday ? "Today's Live Record" : `${day.date} Record`;
-  els.detailDayBadge.textContent = isToday ? 'LIVE' : 'ARCHIVE';
-  els.detailDayBadge.className = isToday ? 'trend-badge' : 'trend-badge archived';
+  if (els.detailDayTitle) els.detailDayTitle.textContent = isToday ? "Today's Live Record" : `${day.date} Record`;
+  if (els.detailDayBadge) {
+    els.detailDayBadge.textContent = isToday ? 'LIVE' : 'ARCHIVE';
+    els.detailDayBadge.className = isToday ? 'trend-badge' : 'trend-badge archived';
+  }
 
-  const m = pixelsToDisplay(day.mousePixels || 0, 'm', state.dpi).meters;
-  els.detailDist.textContent = m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${m.toFixed(0)} m`;
+  const m = pixelsToDisplay(Number(day.mousePixels) || 0, 'm', state.dpi).meters;
+  if (els.detailDist) els.detailDist.textContent = m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${m.toFixed(0)} m`;
 
-  const totalClicks = (day.leftClicks || 0) + (day.rightClicks || 0) + (day.middleClicks || 0);
-  els.detailClicks.textContent = totalClicks.toLocaleString();
+  const totalClicks = (Number(day.leftClicks) || 0) + (Number(day.rightClicks) || 0) + (Number(day.middleClicks) || 0);
+  if (els.detailClicks) els.detailClicks.textContent = totalClicks >= 10000000 ? `${(totalClicks / 1000000).toFixed(1)}M` : totalClicks.toLocaleString();
 
-  els.detailKeys.textContent = (day.keyPresses || 0).toLocaleString();
-  els.detailTime.textContent = formatDuration(day.activeSeconds || 0);
+  const keyPresses = Number(day.keyPresses) || 0;
+  if (els.detailKeys) els.detailKeys.textContent = keyPresses >= 10000000 ? `${(keyPresses / 1000000).toFixed(1)}M` : keyPresses.toLocaleString();
+
+  if (els.detailTime) els.detailTime.textContent = formatDuration(Number(day.activeSeconds) || 0);
 
   // Top app
   let topAppName = 'None';
   if (day.appsList && day.appsList.length) {
-    topAppName = day.appsList[0].name;
-  } else if (day.apps) {
-    const sorted = Object.entries(day.apps).sort((a, b) => b[1] - a[1]);
+    topAppName = day.appsList[0].name || 'None';
+  } else if (day.apps && typeof day.apps === 'object') {
+    const sorted = Object.entries(day.apps).sort((a, b) => (b[1] || 0) - (a[1] || 0));
     if (sorted.length) topAppName = sorted[0][0];
   }
-  els.detailApp.textContent = topAppName;
+  if (els.detailApp) els.detailApp.textContent = topAppName;
 }
 
 async function loadHistory() {
@@ -756,8 +913,14 @@ function applyTheme(name) {
   state.theme = name;
   document.documentElement.dataset.theme = name;
   localStorage.setItem('cm-theme', name);
-  els.themeCards.forEach((c) => c.classList.toggle('active', c.dataset.themeName === name));
-  if (historyCache.length) drawChart(historyCache);
+  els.themeCards.forEach((c) => {
+    const isActive = c.dataset.themeName === name;
+    c.classList.toggle('active', isActive);
+    c.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
+  if (state.activeTab === 'chart') {
+    drawChart(historyCache);
+  }
   showToast('Theme: ' + name.charAt(0).toUpperCase() + name.slice(1));
 }
 
@@ -774,6 +937,7 @@ window.api.onUpdate((payload) => {
   state.peakSpeed = payload.peakSpeed || 0;
   state.apm = payload.apm || 0;
   if (payload.currentApp) state.currentApp = payload.currentApp;
+  if (payload.version && els.versionBadge) els.versionBadge.textContent = `v${payload.version}`;
 
   // Refresh apps cache from DB every 10s so today's data stays fresh
   if (Date.now() - lastAppsFetchTime > 10000) {
@@ -791,9 +955,9 @@ window.api.onUpdate((payload) => {
   }
 });
 
-// Speed Dial click: cycle speed units (m/s -> km/h -> px/s)
+// Speed Dial click or keyboard activation: cycle speed units (m/s -> km/h -> px/s)
 if (els.speedBox) {
-  els.speedBox.addEventListener('click', () => {
+  const cycleSpeed = () => {
     playTone(680, 'sine', 0.03);
     const units = ['m/s', 'km/h', 'px/s'];
     const nextIdx = (units.indexOf(state.speedUnit) + 1) % units.length;
@@ -801,6 +965,13 @@ if (els.speedBox) {
     localStorage.setItem('cm-speed-unit', state.speedUnit);
     render();
     showToast('Speed Unit: ' + state.speedUnit);
+  };
+  els.speedBox.addEventListener('click', cycleSpeed);
+  els.speedBox.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      cycleSpeed();
+    }
   });
 }
 
@@ -808,8 +979,12 @@ if (els.speedBox) {
 els.unitBtns.forEach((btn) => {
   btn.addEventListener('click', () => {
     playTone(600, 'sine', 0.03);
-    els.unitBtns.forEach((b) => b.classList.remove('active'));
+    els.unitBtns.forEach((b) => {
+      b.classList.remove('active');
+      b.setAttribute('aria-pressed', 'false');
+    });
     btn.classList.add('active');
+    btn.setAttribute('aria-pressed', 'true');
     state.unit = btn.dataset.unit;
     if (state.unit === 'm') state.speedUnit = 'm/s';
     else if (state.unit === 'km') state.speedUnit = 'km/h';
@@ -829,8 +1004,16 @@ els.intelTabBtns.forEach((btn) => {
     const tabName = btn.dataset.tab;
     state.activeTab = tabName;
 
-    els.intelTabBtns.forEach((b) => b.classList.toggle('active', b === btn));
-    els.intelPanes.forEach((p) => p.classList.toggle('active', p.id === `tab-${tabName}`));
+    els.intelTabBtns.forEach((b) => {
+      const isActive = b === btn;
+      b.classList.toggle('active', isActive);
+      b.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+    els.intelPanes.forEach((p) => {
+      const isPaneActive = p.id === `tab-${tabName}`;
+      p.classList.toggle('active', isPaneActive);
+      p.setAttribute('aria-hidden', isPaneActive ? 'false' : 'true');
+    });
 
     if (tabName === 'chart') {
       requestAnimationFrame(() => drawChart(historyCache));
@@ -846,15 +1029,33 @@ els.appsRangeBtns.forEach((btn) => {
   });
 });
 
-// 7. Theme Drawer
-els.themeBtn.addEventListener('click', () => {
-  els.themeDrawer.classList.toggle('hidden');
-  els.settingsDrawer.classList.add('hidden');
+// 7. Theme Drawer & Focus Management
+function openThemeDrawer() {
+  els.themeDrawer.classList.remove('hidden');
+  els.themeDrawer.setAttribute('aria-hidden', 'false');
+  els.themeBtn.setAttribute('aria-expanded', 'true');
+  closeSettingsDrawer(false);
   playTone(600, 'sine', 0.03);
-});
-els.closeThemeBtn.addEventListener('click', () => {
+  const activeCard = Array.from(els.themeCards).find((c) => c.classList.contains('active')) || els.themeCards[0];
+  if (activeCard) activeCard.focus();
+}
+
+function closeThemeDrawer(returnFocus = true) {
+  if (els.themeDrawer.classList.contains('hidden')) return;
   els.themeDrawer.classList.add('hidden');
+  els.themeDrawer.setAttribute('aria-hidden', 'true');
+  els.themeBtn.setAttribute('aria-expanded', 'false');
+  if (returnFocus && els.themeBtn) els.themeBtn.focus();
+}
+
+els.themeBtn.addEventListener('click', () => {
+  if (els.themeDrawer.classList.contains('hidden')) {
+    openThemeDrawer();
+  } else {
+    closeThemeDrawer(false);
+  }
 });
+els.closeThemeBtn.addEventListener('click', () => closeThemeDrawer(true));
 els.themeCards.forEach((card) => {
   card.addEventListener('click', () => {
     applyTheme(card.dataset.themeName);
@@ -862,26 +1063,48 @@ els.themeCards.forEach((card) => {
   });
 });
 
-// 8. Settings & Hardware DPI
-els.settingsBtn.addEventListener('click', async () => {
-  els.settingsDrawer.classList.toggle('hidden');
-  els.themeDrawer.classList.add('hidden');
+// 8. Settings & Hardware DPI & Focus Management
+function openSettingsDrawer() {
+  els.settingsDrawer.classList.remove('hidden');
+  els.settingsDrawer.setAttribute('aria-hidden', 'false');
+  els.settingsBtn.setAttribute('aria-expanded', 'true');
+  closeThemeDrawer(false);
   playTone(600, 'sine', 0.03);
-  if (!els.settingsDrawer.classList.contains('hidden') && window.api.getAutoStart) {
-    const isAuto = await window.api.getAutoStart();
-    els.autoStartInput.checked = Boolean(isAuto);
+  if (els.dpiInput) els.dpiInput.focus();
+  if (window.api.getAutoStart) {
+    window.api.getAutoStart().then((isAuto) => {
+      els.autoStartInput.checked = Boolean(isAuto);
+    });
+  }
+}
+
+function closeSettingsDrawer(returnFocus = true) {
+  if (els.settingsDrawer.classList.contains('hidden')) return;
+  els.settingsDrawer.classList.add('hidden');
+  els.settingsDrawer.setAttribute('aria-hidden', 'true');
+  els.settingsBtn.setAttribute('aria-expanded', 'false');
+  if (returnFocus && els.settingsBtn) els.settingsBtn.focus();
+}
+
+els.settingsBtn.addEventListener('click', () => {
+  if (els.settingsDrawer.classList.contains('hidden')) {
+    openSettingsDrawer();
+  } else {
+    closeSettingsDrawer(false);
   }
 });
-els.closeSettingsBtn.addEventListener('click', () => {
-  els.settingsDrawer.classList.add('hidden');
-});
+els.closeSettingsBtn.addEventListener('click', () => closeSettingsDrawer(true));
 
 els.presetChips.forEach((chip) => {
   chip.addEventListener('click', async () => {
     const val = Number(chip.dataset.dpi);
     els.dpiInput.value = val;
     state.dpi = await window.api.setDpi(val);
-    els.presetChips.forEach((c) => c.classList.toggle('active', c === chip));
+    els.presetChips.forEach((c) => {
+      const isActive = c === chip;
+      c.classList.toggle('active', isActive);
+      c.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
     render();
     if (historyCache.length) drawChart(historyCache);
     playTone(600, 'sine', 0.03);
@@ -893,7 +1116,11 @@ els.dpiInput.addEventListener('change', async (e) => {
   const val = Number(e.target.value);
   if (val > 0) {
     state.dpi = await window.api.setDpi(val);
-    els.presetChips.forEach((c) => c.classList.toggle('active', Number(c.dataset.dpi) === val));
+    els.presetChips.forEach((c) => {
+      const isActive = Number(c.dataset.dpi) === val;
+      c.classList.toggle('active', isActive);
+      c.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
     render();
     if (historyCache.length) drawChart(historyCache);
     showToast('Sensor calibrated: ' + val + ' DPI');
@@ -911,8 +1138,11 @@ els.autoStartInput.addEventListener('change', async (e) => {
 els.trendMetricBtns.forEach((btn) => {
   btn.addEventListener('click', () => {
     playTone(560, 'sine', 0.03);
-    els.trendMetricBtns.forEach((b) => b.classList.remove('active'));
-    btn.classList.add('active');
+    els.trendMetricBtns.forEach((b) => {
+      const isActive = b === btn;
+      b.classList.toggle('active', isActive);
+      b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
     state.trendMetric = btn.dataset.metric;
     state.selectedDayIndex = null;
     drawChart(historyCache);
@@ -922,8 +1152,11 @@ els.trendMetricBtns.forEach((btn) => {
 els.trendRangeBtns.forEach((btn) => {
   btn.addEventListener('click', () => {
     playTone(560, 'sine', 0.03);
-    els.trendRangeBtns.forEach((b) => b.classList.remove('active'));
-    btn.classList.add('active');
+    els.trendRangeBtns.forEach((b) => {
+      const isActive = b === btn;
+      b.classList.toggle('active', isActive);
+      b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
     state.trendRange = Number(btn.dataset.range);
     state.selectedDayIndex = null;
     drawChart(historyCache);
@@ -934,25 +1167,49 @@ els.trendRangeBtns.forEach((btn) => {
 els.chart.addEventListener('mousemove', (e) => {
   if (!historyCache || !historyCache.length) return;
   const rect = els.chart.getBoundingClientRect();
+  if (rect.width <= 0) return;
+
   const mouseX = e.clientX - rect.left;
   const displayList = historyCache.slice(-state.trendRange);
-  const stepX = (rect.width - 32) / Math.max(displayList.length - 1, 1);
-  const index = Math.round((mouseX - 16) / stepX);
+  if (!displayList.length) return;
 
-  if (index >= 0 && index < displayList.length) {
+  let index = 0;
+  if (displayList.length > 1) {
+    const paddingLeft = 20;
+    const paddingRight = 20;
+    const chartWidth = Math.max(rect.width - paddingLeft - paddingRight, 10);
+    const stepX = chartWidth / (displayList.length - 1);
+    const rawIdx = Math.round((mouseX - paddingLeft) / stepX);
+    index = Math.max(0, Math.min(rawIdx, displayList.length - 1));
+  }
+
+  // Only redraw if the selected day index actually changed (avoid unnecessary redraws)
+  if (state.selectedDayIndex !== index) {
     state.selectedDayIndex = index;
     drawChart(historyCache);
-    const day = displayList[index];
-    const val = getMetricValue(day, state.trendMetric);
-    els.chartTooltip.textContent = `${day.date || 'Today'}: ${formatMetricDisplay(val, state.trendMetric)}`;
-    els.chartTooltip.classList.remove('hidden');
   }
+
+  const day = displayList[index];
+  const val = getMetricValue(day, state.trendMetric);
+  els.chartTooltip.textContent = `${day.date || 'Today'}: ${formatMetricDisplay(val, state.trendMetric)}`;
+
+  // Position tooltip on opposite side so it never covers the hovered point or cursor
+  if (mouseX < rect.width / 2) {
+    els.chartTooltip.style.left = 'auto';
+    els.chartTooltip.style.right = '8px';
+  } else {
+    els.chartTooltip.style.right = 'auto';
+    els.chartTooltip.style.left = '8px';
+  }
+  els.chartTooltip.classList.remove('hidden');
 });
 
 els.chart.addEventListener('mouseleave', () => {
   els.chartTooltip.classList.add('hidden');
-  state.selectedDayIndex = null;
-  drawChart(historyCache);
+  if (state.selectedDayIndex !== null) {
+    state.selectedDayIndex = null;
+    drawChart(historyCache);
+  }
 });
 
 // 10. Mouse Silhouette Interactive Zones
@@ -989,6 +1246,7 @@ els.reset.addEventListener('click', async () => {
     clearTimeout(resetTimeout);
     els.reset.classList.remove('confirm-state');
     els.resetText.textContent = 'Reset';
+    els.reset.setAttribute('aria-label', 'Reset today\'s statistics');
 
     state.today = await window.api.resetToday();
     render();
@@ -998,9 +1256,11 @@ els.reset.addEventListener('click', async () => {
     playTone(600, 'sine', 0.04);
     els.reset.classList.add('confirm-state');
     els.resetText.textContent = 'Sure?';
+    els.reset.setAttribute('aria-label', 'Confirm reset: Click again to reset today\'s statistics');
     resetTimeout = setTimeout(() => {
       els.reset.classList.remove('confirm-state');
       els.resetText.textContent = 'Reset';
+      els.reset.setAttribute('aria-label', 'Reset today\'s statistics');
     }, 3200);
   }
 });
@@ -1009,12 +1269,36 @@ els.reset.addEventListener('click', async () => {
 window.addEventListener('keydown', (e) => {
   if (e.key === 'F5' || (e.ctrlKey && e.key.toLowerCase() === 'r')) {
     window.location.reload();
+    return;
+  }
+  if (e.key === 'Escape') {
+    let handled = false;
+    if (!els.themeDrawer.classList.contains('hidden')) {
+      closeThemeDrawer(true);
+      handled = true;
+    }
+    if (!els.settingsDrawer.classList.contains('hidden')) {
+      closeSettingsDrawer(true);
+      handled = true;
+    }
+    if (els.reset.classList.contains('confirm-state')) {
+      clearTimeout(resetTimeout);
+      els.reset.classList.remove('confirm-state');
+      els.resetText.textContent = 'Reset';
+      els.reset.setAttribute('aria-label', 'Reset today\'s statistics');
+      handled = true;
+    }
+    if (handled) playTone(440, 'sine', 0.02);
   }
 });
 
+let chartResizeTimer = null;
 window.addEventListener('resize', () => {
   if (state.activeTab === 'chart') {
-    drawChart(historyCache);
+    if (chartResizeTimer) cancelAnimationFrame(chartResizeTimer);
+    chartResizeTimer = requestAnimationFrame(() => {
+      drawChart(historyCache);
+    });
   }
 });
 
@@ -1023,12 +1307,42 @@ window.addEventListener('resize', () => {
 // --------------------------------------------------------------------------
 applyTheme(state.theme);
 
-// Preset unit and app range buttons
-els.unitBtns.forEach((b) => b.classList.toggle('active', b.dataset.unit === state.unit));
-els.appsRangeBtns.forEach((b) => b.classList.toggle('active', b.dataset.range === state.appRange));
+// Preset unit and range buttons with accessible ARIA states
+els.unitBtns.forEach((b) => {
+  const isActive = b.dataset.unit === state.unit;
+  b.classList.toggle('active', isActive);
+  b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+});
+els.intelTabBtns.forEach((b) => {
+  const isActive = b.dataset.tab === state.activeTab;
+  b.classList.toggle('active', isActive);
+  b.setAttribute('aria-selected', isActive ? 'true' : 'false');
+});
+els.intelPanes.forEach((p) => {
+  const isActive = p.id === `tab-${state.activeTab}`;
+  p.classList.toggle('active', isActive);
+  p.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+});
+els.trendMetricBtns.forEach((b) => {
+  const isActive = b.dataset.metric === state.trendMetric;
+  b.classList.toggle('active', isActive);
+  b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+});
+els.trendRangeBtns.forEach((b) => {
+  const isActive = Number(b.dataset.range) === state.trendRange;
+  b.classList.toggle('active', isActive);
+  b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+});
 
 // Render immediately with baseline data so there is zero latency/blank state
 render();
+
+// Single source of truth: synchronize brand version badge from package metadata
+if (window.api && typeof window.api.getVersion === 'function' && els.versionBadge) {
+  window.api.getVersion().then((v) => {
+    if (v) els.versionBadge.textContent = `v${v}`;
+  }).catch(() => {});
+}
 
 // Initial data fetch
 (async () => {
@@ -1044,6 +1358,7 @@ render();
       state.peakSpeed = initialStats.peakSpeed || 0;
       state.apm = initialStats.apm || 0;
       if (initialStats.currentApp) state.currentApp = initialStats.currentApp;
+      if (initialStats.version && els.versionBadge) els.versionBadge.textContent = `v${initialStats.version}`;
       // Immediately paint live telemetry from storage
       render();
     }

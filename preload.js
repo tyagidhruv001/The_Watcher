@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('api', {
     return () => ipcRenderer.removeListener('stats:update', listener);
   },
   getStats: () => ipcRenderer.invoke('get-stats'),
+  getVersion: () => ipcRenderer.invoke('get-version'),
   toggleRunning: () => ipcRenderer.invoke('toggle-running'),
   resetToday: () => ipcRenderer.invoke('reset-today'),
   getHistory: (days) => ipcRenderer.invoke('get-history', days),

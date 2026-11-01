@@ -4,8 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self' data:; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'" />
   <title>The Watcher — System Telemetry</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -35,7 +34,7 @@
         <div class="brand-meta">
           <div class="brand-title-row">
             <span class="brand-title">The Watcher</span>
-            <span class="brand-version-badge">v1.4</span>
+            <span id="versionBadge" class="brand-version-badge">v1.4.0</span>
           </div>
           <div class="brand-sub-wrap">
             <span class="brand-dot"></span>
@@ -46,18 +45,18 @@
 
       <div class="header-tools">
         <!-- Theme Picker toggle -->
-        <button id="themeBtn" class="tool-btn" title="Change Theme Palette" aria-label="Theme">
+        <button id="themeBtn" class="tool-btn" title="Change Theme Palette" aria-label="Theme Palette" aria-haspopup="dialog" aria-expanded="false" aria-controls="themeDrawer">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
-            stroke-linecap="round" stroke-linejoin="round">
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="10"></circle>
             <path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10"></path>
           </svg>
         </button>
 
         <!-- DPI Calibration & Settings -->
-        <button id="settingsBtn" class="tool-btn" title="Hardware Settings & DPI" aria-label="Settings">
+        <button id="settingsBtn" class="tool-btn" title="Hardware Settings & DPI" aria-label="Hardware Settings & DPI" aria-haspopup="dialog" aria-expanded="false" aria-controls="settingsDrawer">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
-            stroke-linecap="round" stroke-linejoin="round">
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="3"></circle>
             <path
               d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
@@ -66,110 +65,110 @@
         </button>
 
         <!-- Live Status Pill -->
-        <div id="statusBadge" class="status-pill live">
-          <span class="live-beacon"></span>
+        <div id="statusBadge" class="status-pill live" role="status" aria-live="polite" aria-label="System telemetry is active">
+          <span class="live-beacon" aria-hidden="true"></span>
           <span id="statusText">LIVE</span>
         </div>
       </div>
     </header>
 
     <!-- Theme Drawer Popover -->
-    <div id="themeDrawer" class="popover-drawer hidden">
+    <div id="themeDrawer" class="popover-drawer hidden" role="dialog" aria-modal="true" aria-labelledby="themeDrawerTitle" aria-hidden="true">
       <div class="drawer-header">
         <div class="drawer-title-group">
-          <span class="drawer-title">Theme Palette</span>
+          <span id="themeDrawerTitle" class="drawer-title">Theme Palette</span>
           <span class="drawer-sub">Select visual profile</span>
         </div>
-        <button id="closeThemeBtn" class="close-btn" aria-label="Close">&times;</button>
+        <button id="closeThemeBtn" class="close-btn" aria-label="Close Theme Palette">&times;</button>
       </div>
-      <div class="theme-grid">
-        <button class="theme-card active" data-theme-name="cyber">
-          <span class="theme-swatch cyber-swatch"></span>
+      <div class="theme-grid" role="group" aria-label="Theme options">
+        <button class="theme-card active" data-theme-name="cyber" aria-pressed="true">
+          <span class="theme-swatch cyber-swatch" aria-hidden="true"></span>
           <div class="theme-card-meta">
             <span class="theme-name">Cyber Cyan</span>
             <span class="theme-tone">Electric Cyan & Neon</span>
           </div>
-          <span class="theme-check">✓</span>
+          <span class="theme-check" aria-hidden="true">✓</span>
         </button>
-        <button class="theme-card" data-theme-name="tokyo">
-          <span class="theme-swatch tokyo-swatch"></span>
+        <button class="theme-card" data-theme-name="tokyo" aria-pressed="false">
+          <span class="theme-swatch tokyo-swatch" aria-hidden="true"></span>
           <div class="theme-card-meta">
             <span class="theme-name">Tokyo Neon</span>
             <span class="theme-tone">Hot Pink & Violet</span>
           </div>
-          <span class="theme-check">✓</span>
+          <span class="theme-check" aria-hidden="true">✓</span>
         </button>
-        <button class="theme-card" data-theme-name="solar">
-          <span class="theme-swatch solar-swatch"></span>
+        <button class="theme-card" data-theme-name="solar" aria-pressed="false">
+          <span class="theme-swatch solar-swatch" aria-hidden="true"></span>
           <div class="theme-card-meta">
             <span class="theme-name">Solar Amber</span>
             <span class="theme-tone">Hyper Gold & Crimson</span>
           </div>
-          <span class="theme-check">✓</span>
+          <span class="theme-check" aria-hidden="true">✓</span>
         </button>
-        <button class="theme-card" data-theme-name="frost">
-          <span class="theme-swatch frost-swatch"></span>
+        <button class="theme-card" data-theme-name="frost" aria-pressed="false">
+          <span class="theme-swatch frost-swatch" aria-hidden="true"></span>
           <div class="theme-card-meta">
             <span class="theme-name">Glacier Frost</span>
             <span class="theme-tone">Cryo Azure & Cobalt</span>
           </div>
-          <span class="theme-check">✓</span>
+          <span class="theme-check" aria-hidden="true">✓</span>
         </button>
-        <button class="theme-card" data-theme-name="matrix">
-          <span class="theme-swatch matrix-swatch"></span>
+        <button class="theme-card" data-theme-name="matrix" aria-pressed="false">
+          <span class="theme-swatch matrix-swatch" aria-hidden="true"></span>
           <div class="theme-card-meta">
             <span class="theme-name">Matrix Emerald</span>
             <span class="theme-tone">Phosphor Green & Mint</span>
           </div>
-          <span class="theme-check">✓</span>
+          <span class="theme-check" aria-hidden="true">✓</span>
         </button>
       </div>
     </div>
 
     <!-- Settings & Calibration Drawer -->
-    <div id="settingsDrawer" class="popover-drawer hidden">
+    <div id="settingsDrawer" class="popover-drawer hidden" role="dialog" aria-modal="true" aria-labelledby="settingsDrawerTitle" aria-hidden="true">
       <div class="drawer-header">
         <div class="drawer-title-group">
-          <span class="drawer-title">Hardware Settings</span>
+          <span id="settingsDrawerTitle" class="drawer-title">Hardware Settings</span>
           <span class="drawer-sub">Sensors & preferences</span>
         </div>
-        <button id="closeSettingsBtn" class="close-btn" aria-label="Close">&times;</button>
+        <button id="closeSettingsBtn" class="close-btn" aria-label="Close Hardware Settings">&times;</button>
       </div>
       <div class="dpi-body">
         <div class="dpi-input-row">
           <div class="dpi-label-group">
-            <span class="dpi-desc">Mouse Sensor DPI</span>
+            <label for="dpiInput" class="dpi-desc">Mouse Sensor DPI</label>
             <span class="dpi-sub">Hardware dots-per-inch</span>
           </div>
           <div class="dpi-pill-input">
-            <input id="dpiInput" type="number" min="100" max="32000" step="50" value="1000" />
-            <span class="unit-tag">DPI</span>
+            <input id="dpiInput" type="number" min="100" max="32000" step="50" value="1000" aria-label="Mouse Sensor DPI" />
+            <span class="unit-tag" aria-hidden="true">DPI</span>
           </div>
         </div>
-        <div class="dpi-preset-chips">
-          <button class="chip" data-dpi="400">400</button>
-          <button class="chip" data-dpi="800">800</button>
-          <button class="chip active" data-dpi="1000">1000</button>
-          <button class="chip" data-dpi="1600">1600</button>
-          <button class="chip" data-dpi="3200">3200</button>
+        <div class="dpi-preset-chips" role="group" aria-label="DPI presets">
+          <button class="chip" data-dpi="400" aria-pressed="false">400</button>
+          <button class="chip" data-dpi="800" aria-pressed="false">800</button>
+          <button class="chip active" data-dpi="1000" aria-pressed="true">1000</button>
+          <button class="chip" data-dpi="1600" aria-pressed="false">1600</button>
+          <button class="chip" data-dpi="3200" aria-pressed="false">3200</button>
         </div>
 
         <div class="setting-divider"></div>
 
         <div class="setting-toggle-row">
           <div class="toggle-meta">
-            <span class="toggle-title">Start with Windows</span>
+            <label for="autoStartInput" class="toggle-title">Start with Windows</label>
             <span class="toggle-hint">Launch minimized in tray on boot</span>
           </div>
           <label class="switch">
-            <input id="autoStartInput" type="checkbox" />
-            <span class="slider"></span>
+            <input id="autoStartInput" type="checkbox" aria-label="Start with Windows on boot" />
+            <span class="slider" aria-hidden="true"></span>
           </label>
         </div>
 
         <div class="hotkey-banner">
           <div class="hotkey-label">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <rect x="2" y="4" width="20" height="16" rx="2"></rect>
               <line x1="6" y1="12" x2="18" y2="12"></line>
             </svg>
@@ -179,7 +178,7 @@
         </div>
 
         <div class="tray-tip">
-          <span class="tray-tip-icon">ℹ</span>
+          <span class="tray-tip-icon" aria-hidden="true">ℹ</span>
           <span>Closing the window docks it silently into the system tray.</span>
         </div>
       </div>
@@ -191,11 +190,11 @@
       <div class="hero-panel hero-distance">
         <div class="panel-head">
           <span class="eyebrow">CURSOR TRAVEL TODAY</span>
-          <div class="unit-toggle-strip">
-            <button class="unit-btn" data-unit="px">px</button>
-            <button class="unit-btn active" data-unit="m">m</button>
-            <button class="unit-btn" data-unit="km">km</button>
-            <button class="unit-btn" data-unit="mi">mi</button>
+          <div class="unit-toggle-strip" role="group" aria-label="Distance unit selection">
+            <button class="unit-btn" data-unit="px" aria-pressed="false" aria-label="Pixels">px</button>
+            <button class="unit-btn active" data-unit="m" aria-pressed="true" aria-label="Meters">m</button>
+            <button class="unit-btn" data-unit="km" aria-pressed="false" aria-label="Kilometers">km</button>
+            <button class="unit-btn" data-unit="mi" aria-pressed="false" aria-label="Miles">mi</button>
           </div>
         </div>
 
@@ -210,13 +209,13 @@
         <div class="milestone-box" id="milestoneBox">
           <div class="milestone-text">
             <div class="milestone-left">
-              <span id="milestoneIcon" class="milestone-emoji">🎳</span>
+              <span id="milestoneIcon" class="milestone-emoji" aria-hidden="true">🎳</span>
               <span id="milestoneDesc" class="milestone-title">Goal: Bowling Lane (10m)</span>
             </div>
             <span id="milestonePct" class="milestone-percent">0%</span>
           </div>
-          <div class="milestone-bar-bg">
-            <div id="milestoneProgress" class="milestone-bar-fill" style="width: 0%">
+          <div id="milestoneProgressBar" class="milestone-bar-bg" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Daily distance milestone progress">
+            <div id="milestoneProgress" class="milestone-bar-fill">
               <div class="milestone-flare"></div>
             </div>
           </div>
@@ -229,7 +228,7 @@
       <!-- Live Speedometer & APM Dial -->
       <div class="hero-panel hero-speed">
         <div class="speed-dial-wrap">
-          <svg class="speed-svg" viewBox="0 0 100 64">
+          <svg class="speed-svg" viewBox="0 0 100 64" aria-hidden="true">
             <!-- Defs for gauge gradient -->
             <defs>
               <linearGradient id="speedGrad" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -245,7 +244,7 @@
             <path id="speedArc" class="speed-meter" d="M 15 54 A 35 35 0 0 1 85 54" fill="none" stroke-width="7"
               stroke-dasharray="110" stroke-dashoffset="110" stroke-linecap="round"></path>
           </svg>
-          <div class="speed-value-box" id="speedBox" title="Click to cycle speed unit (m/s, km/h, px/s)">
+          <div class="speed-value-box" id="speedBox" role="button" tabindex="0" title="Click or press Enter to cycle speed unit (m/s, km/h, px/s)" aria-label="Cycle speed unit">
             <span id="speedValue" class="speed-num">0.00</span>
             <span id="speedUnit" class="speed-unit">m/s</span>
             <span id="speedAlt" class="speed-alt">0.0 km/h</span>
@@ -349,9 +348,9 @@
 
     <!-- Deep-Dive Interactive Deck (Tabs) -->
     <section class="intel-deck">
-      <nav class="intel-tabs">
-        <button class="intel-tab-btn active" data-tab="apps">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <nav class="intel-tabs" role="tablist" aria-label="Telemetry detail views">
+        <button id="tab-btn-apps" class="intel-tab-btn active" data-tab="apps" role="tab" aria-selected="true" aria-controls="tab-apps">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <rect x="3" y="3" width="7" height="7"></rect>
             <rect x="14" y="3" width="7" height="7"></rect>
             <rect x="14" y="14" width="7" height="7"></rect>
@@ -359,22 +358,22 @@
           </svg>
           Top Apps
         </button>
-        <button class="intel-tab-btn" data-tab="keys">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <button id="tab-btn-keys" class="intel-tab-btn" data-tab="keys" role="tab" aria-selected="false" aria-controls="tab-keys">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <rect x="2" y="4" width="20" height="16" rx="2"></rect>
             <line x1="6" y1="12" x2="18" y2="12"></line>
           </svg>
           Top Keys
         </button>
-        <button class="intel-tab-btn" data-tab="mouse">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <button id="tab-btn-mouse" class="intel-tab-btn" data-tab="mouse" role="tab" aria-selected="false" aria-controls="tab-mouse">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <rect x="6" y="3" width="12" height="18" rx="6"></rect>
             <line x1="12" y1="7" x2="12" y2="11"></line>
           </svg>
           Click Map
         </button>
-        <button class="intel-tab-btn" data-tab="chart">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <button id="tab-btn-chart" class="intel-tab-btn" data-tab="chart" role="tab" aria-selected="false" aria-controls="tab-chart">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <path d="M3 3v18h18"></path>
             <path d="m19 9-5 5-4-4-3 3"></path>
           </svg>
@@ -384,22 +383,22 @@
 
       <div class="intel-body">
         <!-- 1. Apps Panel -->
-        <div id="tab-apps" class="intel-pane active">
+        <div id="tab-apps" class="intel-pane active" role="tabpanel" aria-labelledby="tab-btn-apps" tabindex="0">
           <div class="apps-toolbar">
             <span class="apps-toolbar-title">TOP APPS · TODAY</span>
           </div>
-          <ol id="appUsage" class="visual-list"></ol>
+          <ol id="appUsage" class="visual-list" aria-label="Top applications today"></ol>
         </div>
 
         <!-- 2. Keys Panel -->
-        <div id="tab-keys" class="intel-pane">
+        <div id="tab-keys" class="intel-pane" role="tabpanel" aria-labelledby="tab-btn-keys" tabindex="0">
           <div class="keycaps-wrap">
-            <ol id="topKeys" class="visual-list"></ol>
+            <ol id="topKeys" class="visual-list" aria-label="Most pressed keys today"></ol>
           </div>
         </div>
 
         <!-- 3. Mouse Map Panel -->
-        <div id="tab-mouse" class="intel-pane">
+        <div id="tab-mouse" class="intel-pane" role="tabpanel" aria-labelledby="tab-btn-mouse" tabindex="0">
           <div class="mouse-map-container">
             <div class="mouse-silhouette">
               <div id="mouseLeftZone" class="mouse-button-zone left-btn">
@@ -416,17 +415,17 @@
             </div>
             <div class="mouse-stats-sidebar">
               <div class="mouse-stat-row">
-                <span class="stat-dot dot-left"></span>
+                <span class="stat-dot dot-left" aria-hidden="true"></span>
                 <span class="mouse-stat-label">Left Clicks:</span>
                 <strong id="mouseLeftTotal" class="mouse-stat-val">0</strong>
               </div>
               <div class="mouse-stat-row">
-                <span class="stat-dot dot-right"></span>
+                <span class="stat-dot dot-right" aria-hidden="true"></span>
                 <span class="mouse-stat-label">Right Clicks:</span>
                 <strong id="mouseRightTotal" class="mouse-stat-val">0</strong>
               </div>
               <div class="mouse-stat-row">
-                <span class="stat-dot dot-mid"></span>
+                <span class="stat-dot dot-mid" aria-hidden="true"></span>
                 <span class="mouse-stat-label">Middle / Wheel:</span>
                 <strong id="mouseMidTotal" class="mouse-stat-val">0</strong>
               </div>
@@ -435,27 +434,29 @@
         </div>
 
         <!-- 4. Rich Trends & Analytics Panel -->
-        <div id="tab-chart" class="intel-pane">
+        <div id="tab-chart" class="intel-pane" role="tabpanel" aria-labelledby="tab-btn-chart" tabindex="0">
           <div class="trend-toolbar">
-            <div class="trend-metrics-group">
-              <button class="trend-metric-btn active" data-metric="dist" title="Mouse Distance">Distance</button>
-              <button class="trend-metric-btn" data-metric="clicks" title="Total Clicks">Clicks</button>
-              <button class="trend-metric-btn" data-metric="keys" title="Keystrokes">Keys</button>
-              <button class="trend-metric-btn" data-metric="time" title="Active Time">Active</button>
+            <div class="trend-metrics-group" role="group" aria-label="Chart metric selection">
+              <button class="trend-metric-btn active" data-metric="dist" title="Mouse Distance" aria-pressed="true">Distance</button>
+              <button class="trend-metric-btn" data-metric="clicks" title="Total Clicks" aria-pressed="false">Clicks</button>
+              <button class="trend-metric-btn" data-metric="keys" title="Keystrokes" aria-pressed="false">Keys</button>
+              <button class="trend-metric-btn" data-metric="time" title="Active Time" aria-pressed="false">Active</button>
             </div>
-            <div class="trend-range-group">
-              <button class="trend-range-btn active" data-range="7">7D</button>
-              <button class="trend-range-btn" data-range="14">14D</button>
+            <div class="trend-range-group" role="group" aria-label="Chart time range selection">
+              <button class="trend-range-btn active" data-range="7" aria-pressed="true">7D</button>
+              <button class="trend-range-btn" data-range="14" aria-pressed="false">14D</button>
             </div>
           </div>
 
-          <div class="chart-box">
-            <canvas id="chart"></canvas>
-            <div id="chartTooltip" class="chart-tooltip hidden"></div>
+          <div class="chart-box" role="region" aria-label="Activity Trends Chart">
+            <canvas id="chart" role="img" aria-label="Interactive activity trend graph showing telemetry over time">
+              <p>Activity trend graph showing telemetry over time.</p>
+            </canvas>
+            <div id="chartTooltip" class="chart-tooltip hidden" role="status" aria-live="polite"></div>
           </div>
 
           <!-- Trend KPI Tiles -->
-          <div class="trend-kpis">
+          <div class="trend-kpis" role="region" aria-label="Period Statistics">
             <div class="trend-kpi-card">
               <span class="trend-kpi-label">PERIOD TOTAL</span>
               <strong id="trendTotalVal" class="trend-kpi-num">--</strong>
@@ -471,7 +472,7 @@
           </div>
 
           <!-- Day Inspector Detail Card -->
-          <div id="trendDayDetail" class="trend-day-card">
+          <div id="trendDayDetail" class="trend-day-card" role="region" aria-label="Selected Day Record">
             <div class="trend-day-header">
               <span id="detailDayTitle" class="trend-day-date">Today's Summary</span>
               <span id="detailDayBadge" class="trend-badge">LIVE</span>
@@ -491,17 +492,17 @@
 
     <!-- Bottom Action Deck -->
     <footer class="action-footer">
-      <button id="toggle" class="btn btn-action-primary" title="Toggle Tracking">
-        <svg id="toggleIcon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+      <button id="toggle" class="btn btn-action-primary" title="Toggle Tracking" aria-label="Pause tracking" aria-pressed="false">
+        <svg id="toggleIcon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <rect x="6" y="4" width="4" height="16" rx="1"></rect>
           <rect x="14" y="4" width="4" height="16" rx="1"></rect>
         </svg>
         <span id="toggleText">Pause</span>
       </button>
 
-      <button id="shareBtn" class="btn btn-action-secondary" title="Copy Daily Stats to Clipboard">
+      <button id="shareBtn" class="btn btn-action-secondary" title="Copy Daily Stats to Clipboard" aria-label="Copy daily telemetry report to clipboard">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
-          stroke-linecap="round" stroke-linejoin="round">
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
           <polyline points="16 6 12 2 8 6"></polyline>
           <line x1="12" y1="2" x2="12" y2="15"></line>
@@ -509,9 +510,9 @@
         <span id="shareText">Share</span>
       </button>
 
-      <button id="reset" class="btn btn-action-danger" title="Reset Today's Counters">
+      <button id="reset" class="btn btn-action-danger" title="Reset Today's Counters" aria-label="Reset today's statistics">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
-          stroke-linecap="round" stroke-linejoin="round">
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
           <path d="M3 3v5h5"></path>
         </svg>
